@@ -11,7 +11,11 @@
  *      c) Image generic hai (cricket ball close-up, logo, placeholder, etc.)
  *      d) Image bahut choti hai (likely a thumbnail/icon, not a real article image)
  *   4. Problem mile toh:
- *      - Post title se relevant real cricket photo dhundta hai (Unsplash/Pexels/curated)
+ *      - Smart technique se real news article image dhundta hai:
+ *         a) Post content se inline source link parse karta hai
+ *         b) Resolution aur scraping check karta hai
+ *         c) Agar fail hota hai, toh friendly domains (Cricbuzz, TOI, News18, Livemint, etc.) pe search kar ke scrape karta hai
+ *         d) Agar bilkul nahi milta, tabhi generic APIs (Unsplash/Pexels) ya curated stock list ka use karta hai
  *      - HTML update karta hai
  *      - Blogger API se post update karta hai
  *   5. Summary Telegram pe bhejta hai
@@ -22,6 +26,7 @@ import fs from 'fs';
 import path from 'path';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
+import GoogleNewsDecoder from 'google-news-decoder';
 
 dotenv.config();
 
@@ -48,26 +53,50 @@ const GENERIC_IMAGE_PATTERNS = [
   'espncricinfo.com/i/db/PICTURES/CMS/316700', // espn generic
   'hindustantimes.com/static-content',
   '1x1.gif', '1x1.png', 'spacer.gif',
-  // ── ALL curated Unsplash fallback images (stock photos, not article-specific) ──
-  'photo-1531415074968', // stadium lights
-  'photo-1593341606579', // batsman
-  'photo-1512412086890', // pitch wide
-  'photo-1589801258579', // floodlit evening
-  'photo-1508098682722', // crowd fans
-  'photo-1552664730-d307ca884978', // team huddle
-  'photo-1540747913346', // bowler action
-  'photo-1624880357913', // aerial view
-  'photo-1574629810360', // trophy celebration
-  'photo-1599474924187', // fielding
-  'photo-1575361204480', // cricket ball close-up
-  'photo-1629818651924', // equipment
-  'photo-1522778119026', // umpire
-  'photo-1569517282132', // india team
-  'photo-1606925797300', // T20 batting
+  // Curated fallback images
+  'photo-1531415074968',
+  'photo-1593341606579',
+  'photo-1512412086890',
+  'photo-1589801258579',
+  'photo-1508098682722',
+  'photo-1552664730-d307ca884978',
+  'photo-1540747913346',
+  'photo-1624880357913',
+  'photo-1574629810360',
+  'photo-1599474924187',
+  'photo-1575361204480',
+  'photo-1629818651924',
+  'photo-1522778119026',
+  'photo-1569517282132',
+  'photo-1606925797300',
 ];
 
+const FRIENDLY_DOMAINS = [
+  'timesofindia.indiatimes.com',
+  'cricbuzz.com',
+  'livemint.com',
+  'news18.com',
+  'indianexpress.com',
+  'timesofindia.com',
+  'moneycontrol.com',
+  'abplive.com'
+];
 
-// Curated high-quality fallback cricket images (from workflow.js)
+const BLOCKED_DOMAINS = [
+  'sports.ndtv.com',
+  'ndtv.com',
+  'olympics.com',
+  'facebook.com',
+  'twitter.com',
+  'instagram.com',
+  'hindustantimes.com',
+  'espncricinfo.com',
+  'espn.com',
+  'reddit.com',
+  'youtube.com'
+];
+
+// Curated high-quality fallback cricket images
 const CURATED_CRICKET_IMAGES = [
   { url: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=850&auto=format&fit=crop&q=80', caption: 'Cricket match in progress at a packed stadium. Photo via Unsplash.', keywords: ['stadium', 'match', 'ipl', 't20', 'odi', 'international', 'final', 'qualifier'] },
   { url: 'https://images.unsplash.com/photo-1593341606579-7f97d02474d4?w=850&auto=format&fit=crop&q=80', caption: 'A cricket batsman in action at the crease. Photo via Unsplash.', keywords: ['batsman', 'batting', 'century', 'fifty', 'innings', 'dhoni', 'kohli', 'sharma', 'six', 'four'] },
@@ -91,19 +120,29 @@ function fetchUrl(url, extraHeaders = {}) {
         hostname: urlObj.hostname,
         path: urlObj.pathname + urlObj.search,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PitchWatchBot/1.0)',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8',
+          'Cache-Control': 'max-age=0',
           ...extraHeaders
         },
         timeout: 8000
       };
       https.get(options, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return fetchUrl(new URL(res.headers.location, url).href, extraHeaders).then(resolve);
+        }
         let data = '';
         res.on('data', c => data += c);
-        res.on('end', () => resolve({ ok: res.statusCode >= 200 && res.statusCode < 400, statusCode: res.statusCode, text: () => data }));
-      }).on('error', (err) => resolve({ ok: false, error: err.message }))
-        .on('timeout', () => resolve({ ok: false, error: 'timeout' }));
+        res.on('end', () => resolve({
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          statusCode: res.statusCode,
+          text: () => data
+        }));
+      }).on('error', (err) => resolve({ ok: false, statusCode: 500, text: () => err.message }))
+        .on('timeout', () => resolve({ ok: false, statusCode: 504, text: () => 'timeout' }));
     } catch (err) {
-      resolve({ ok: false, error: err.message });
+      resolve({ ok: false, statusCode: 500, text: () => err.message });
     }
   });
 }
@@ -152,7 +191,155 @@ async function isImageBroken(url) {
   return !res.ok;
 }
 
-async function getBestImage(postTitle, postLabels = []) {
+// --- Query Google News RSS ---
+async function searchRSS(query) {
+  try {
+    const feedUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-IN&gl=IN&ceid=IN:en`;
+    const res = await fetchUrl(feedUrl);
+    if (!res.ok) return [];
+    const xml = res.text();
+    const matches = [...xml.matchAll(/<item>[\s\S]*?<link>([^<]+)<\/link>/gi)];
+    return matches.map(m => m[1].trim());
+  } catch (err) {
+    console.warn(`  [Search Error] ${err.message}`);
+    return [];
+  }
+}
+
+// --- Decode Google News Redirect ---
+async function decodeUrl(redirectUrl) {
+  if (!redirectUrl.includes('news.google.com')) return redirectUrl;
+  try {
+    const decoder = new GoogleNewsDecoder();
+    const result = await decoder.decodeGoogleNewsUrl(redirectUrl);
+    if (result && result.status && result.decodedUrl) {
+      return result.decodedUrl;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return redirectUrl;
+}
+
+// --- Scrape Image Helper ---
+async function scrapeOgImage(articleUrl) {
+  const realUrl = await decodeUrl(articleUrl);
+  
+  const domain = new URL(realUrl).hostname.toLowerCase();
+  if (BLOCKED_DOMAINS.some(blocked => domain.includes(blocked))) {
+    throw new Error(`Domain ${domain} is blocked.`);
+  }
+
+  const res = await fetchUrl(realUrl);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.statusCode}`);
+  }
+  const html = res.text();
+
+  const ogMatch =
+    html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i) ||
+    html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i);
+
+  if (!ogMatch || !ogMatch[1]) {
+    throw new Error('No image tag');
+  }
+
+  const imageUrl = ogMatch[1].trim();
+  const isGeneric =
+    imageUrl.includes('logo') ||
+    imageUrl.includes('default') ||
+    imageUrl.includes('fallback') ||
+    imageUrl.includes('placeholder') ||
+    imageUrl.includes('IE-OGimage') ||
+    imageUrl.includes('facebook-share') ||
+    imageUrl.endsWith('mc_logo_200x200.png');
+
+  if (!imageUrl.startsWith('http') || isGeneric) {
+    throw new Error('Generic image URL');
+  }
+
+  const sourceDomain = realUrl.replace(/https?:\/\/(www\.)?/, '').split('/')[0];
+  return { imageUrl, sourceDomain };
+}
+
+// --- Loop and Try Scraping Links ---
+async function tryLinks(links) {
+  for (let i = 0; i < Math.min(6, links.length); i++) {
+    const link = links[i];
+    try {
+      const result = await scrapeOgImage(link);
+      if (result) return result;
+    } catch (err) {
+      // ignore individual failures
+    }
+  }
+  return null;
+}
+
+// --- Smart Article Image Solver ---
+async function getSmartArticleImage(postTitle, inlineSourceUrl = null) {
+  // 1. Try inline source URL first (if available)
+  if (inlineSourceUrl) {
+    try {
+      const result = await scrapeOgImage(inlineSourceUrl);
+      if (result) return result;
+    } catch (err) {
+      // ignore inline fail
+    }
+  }
+
+  // Clean title for search queries
+  const cleanTitle = postTitle
+    .replace(/#[a-zA-Z0-9]+/g, '')
+    .replace(/\|\s*#\w+/g, '')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // 2. Search on friendly domains (Cricbuzz, TOI, HT, ESPN, Livemint)
+  const friendlyFilter = `(` + FRIENDLY_DOMAINS.map(d => `site:${d}`).join(' OR ') + `)`;
+  const friendlyQuery = `"${cleanTitle}" ${friendlyFilter}`;
+  
+  let links = await searchRSS(friendlyQuery);
+  if (links.length > 0) {
+    const result = await tryLinks(links);
+    if (result) return result;
+  }
+
+  // Try friendly search without quotes (broader match)
+  const broaderFriendlyQuery = `${cleanTitle} ${friendlyFilter}`;
+  links = await searchRSS(broaderFriendlyQuery);
+  if (links.length > 0) {
+    const result = await tryLinks(links);
+    if (result) return result;
+  }
+
+  // 3. Try generic search
+  links = await searchRSS(`${cleanTitle} cricket`);
+  if (links.length > 0) {
+    const result = await tryLinks(links);
+    if (result) return result;
+  }
+
+  return null;
+}
+
+async function getBestImage(postTitle, postLabels = [], inlineSourceUrl = null) {
+  // Try smart scraping first!
+  try {
+    const smartImg = await getSmartArticleImage(postTitle, inlineSourceUrl);
+    if (smartImg) {
+      return {
+        url: smartImg.imageUrl,
+        caption: `Photo: ${smartImg.sourceDomain}`
+      };
+    }
+  } catch (err) {
+    // ignore smart fail, go to API fallback
+  }
+
   const query = postTitle.replace(/[^\w\s]/g, '').slice(0, 60);
 
   // 1. Try Unsplash API
@@ -201,7 +388,6 @@ async function getBestImage(postTitle, postLabels = []) {
     img.keywords.some(kw => combined.includes(kw))
   );
   const pool = matches.length > 0 ? matches : CURATED_CRICKET_IMAGES;
-  // Deterministic but varied: use title hash to pick consistent image for same post
   const hash = postTitle.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   return pool[hash % pool.length];
 }
@@ -214,11 +400,23 @@ function extractFirstImageUrl(html) {
   return match ? match[1] : null;
 }
 
+function extractSourceUrl(htmlContent) {
+  const gnewsMatch = htmlContent.match(/href=["'](https?:\/\/news\.google\.com\/rss\/articles\/[^"']+)["']/i);
+  if (gnewsMatch && gnewsMatch[1]) {
+    return gnewsMatch[1];
+  }
+
+  const eeatMatch = htmlContent.match(/href=["']([^"']+)["'][^>]*rel=["']nofollow noopener["']/i) ||
+                    htmlContent.match(/rel=["']nofollow noopener["'][^>]*href=["']([^"']+)["']/i);
+  if (eeatMatch && eeatMatch[1]) {
+    return eeatMatch[1];
+  }
+  return null;
+}
+
 function replaceFirstImage(html, newImageUrl, newCaption) {
-  // Replace the existing first image src
   const newImgTag = `<img src="${newImageUrl}" alt="${newCaption}" title="${newCaption}" style="width:100%;max-width:850px;height:auto;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.15);" />`;
 
-  // Try to replace existing <img> tag
   if (/<img[^>]+src=["'][^"']*["'][^>]*>/i.test(html)) {
     return html.replace(/<img[^>]+src=["'][^"']*["'][^>]*>/i, newImgTag);
   }
@@ -232,7 +430,6 @@ function injectImageAtTop(html, imageUrl, caption) {
   <p style="font-size:0.85em;color:#666;margin-top:8px;font-style:italic;">${caption}</p>
 </div>
 `;
-  // Inject right after the first <script type="application/ld+json"> block if exists (after schema)
   const schemaEnd = html.indexOf('</script>');
   if (schemaEnd !== -1) {
     const secondScriptEnd = html.indexOf('</script>', schemaEnd + 10);
@@ -242,7 +439,6 @@ function injectImageAtTop(html, imageUrl, caption) {
     }
     return html.slice(0, schemaEnd + 9) + '\n' + imageBlock + html.slice(schemaEnd + 9);
   }
-  // Otherwise just prepend
   return imageBlock + html;
 }
 
@@ -253,7 +449,6 @@ async function auditAndFixImages() {
   console.log(`[Audit] Image Audit started: ${new Date().toLocaleString('en-IN')}`);
   console.log('='.repeat(60));
 
-  // Setup Google API clients
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !BLOG_ID) {
     console.error('[Audit] Missing required env vars: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BLOG_ID');
     process.exit(1);
@@ -269,7 +464,6 @@ async function auditAndFixImages() {
   const auth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
   auth.setCredentials(tokens);
 
-  // Auto-save refreshed tokens
   auth.on('tokens', (newTokens) => {
     const updated = { ...tokens, ...newTokens };
     fs.writeFileSync(tokenPath, JSON.stringify(updated, null, 2));
@@ -278,7 +472,6 @@ async function auditAndFixImages() {
 
   const blogger = google.blogger({ version: 'v3', auth });
 
-  // Fetch ALL posts (paginated)
   console.log('[Audit] Fetching all posts from Blogger...');
   const allPosts = [];
   let pageToken = null;
@@ -311,7 +504,6 @@ async function auditAndFixImages() {
 
   console.log(`\n[Audit] Total posts fetched: ${allPosts.length}`);
 
-  // Audit each post
   const stats = {
     total: allPosts.length,
     noImage: 0,
@@ -341,7 +533,6 @@ async function auditAndFixImages() {
         problemType = 'GENERIC_IMAGE';
         stats.genericImage++;
       } else {
-        // Check if image is broken (only for non-Unsplash to save rate limits)
         const isUnsplashOrPexels = firstImageUrl.includes('unsplash.com') || firstImageUrl.includes('pexels.com');
         if (!isUnsplashOrPexels) {
           const broken = await isImageBroken(firstImageUrl);
@@ -360,8 +551,11 @@ async function auditAndFixImages() {
 
       console.log(`${postNum} 🔧 FIXING [${problemType}]: "${post.title?.slice(0, 50)}"`);
 
-      // Get a better image
-      const newImage = await getBestImage(post.title, post.labels);
+      // Extract inline source URL if available
+      const inlineSourceUrl = extractSourceUrl(content);
+
+      // Get a better image using the smart scraper + fallbacks
+      const newImage = await getBestImage(post.title, post.labels, inlineSourceUrl);
       if (!newImage || !newImage.url) {
         console.warn(`${postNum} ⚠️ Could not find replacement image. Skipping.`);
         stats.fixFailed++;
@@ -374,9 +568,7 @@ async function auditAndFixImages() {
       if (problemType === 'NO_IMAGE') {
         updatedContent = injectImageAtTop(content, newImage.url, newImage.caption);
       } else {
-        // Replace existing bad image
         updatedContent = replaceFirstImage(content, newImage.url, newImage.caption);
-        // Also update caption if present
         updatedContent = updatedContent.replace(
           /<p[^>]*style="[^"]*font-size:\s*0\.85em[^"]*"[^>]*>.*?<\/p>/i,
           `<p style="font-size:0.85em;color:#666;margin-top:8px;font-style:italic;">${newImage.caption}</p>`
@@ -396,8 +588,7 @@ async function auditAndFixImages() {
       fixedTitles.push(post.title?.slice(0, 60));
       console.log(`${postNum} ✅ FIXED: "${post.title?.slice(0, 50)}" → ${newImage.url.slice(0, 60)}...`);
 
-      // Small delay to respect API rate limits
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 600));
 
     } catch (err) {
       console.error(`${postNum} ❌ Error processing "${post.title?.slice(0, 40)}":`, err.message);
@@ -419,7 +610,6 @@ async function auditAndFixImages() {
   console.log(`  Fix failed          : ${stats.fixFailed}`);
   console.log('='.repeat(60));
 
-  // Send Telegram summary
   const needsAttention = stats.fixFailed > 0;
   const emoji = needsAttention ? '⚠️' : '✅';
 
