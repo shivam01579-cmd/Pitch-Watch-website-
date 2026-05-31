@@ -1703,6 +1703,56 @@ async function runWorkflowStep() {
 // NOTE: Loop mode ab Windows Task Scheduler handle karta hai.
 // Script ek baar chalta hai, kaam karta hai, aur band ho jaata hai.
 // Task Scheduler har 30 min pe automatically restart karta hai.
+
+async function triggerNextWorkflowRun() {
+  const PAT = process.env.ACTIONS_PAT;
+  if (!PAT) {
+    console.warn('[Workflow Loop] ACTIONS_PAT not found in env — cannot auto-trigger next run!');
+    return;
+  }
+
+  const owner = 'shivam01579-cmd';
+  const repo = 'Pitch-Watch-website-';
+  const workflowId = 'news-poster.yml';
+  const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`;
+
+  const payload = JSON.stringify({ ref: 'main' });
+
+  return new Promise((resolve) => {
+    try {
+      const urlObj = new URL(url);
+      const req = https.request({
+        hostname: urlObj.hostname,
+        path: urlObj.pathname,
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${PAT}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'PitchWatch/1.0',
+          'Content-Length': Buffer.byteLength(payload)
+        }
+      }, (res) => {
+        let body = '';
+        res.on('data', c => body += c);
+        res.on('end', () => {
+          console.log(`[Workflow Loop] Auto-trigger dispatch response: HTTP ${res.statusCode}`);
+          resolve(res.statusCode >= 200 && res.statusCode < 300);
+        });
+      });
+      req.on('error', (err) => {
+        console.error(`[Workflow Loop] Error during auto-trigger: ${err.message}`);
+        resolve(false);
+      });
+      req.write(payload);
+      req.end();
+    } catch (err) {
+      console.error(`[Workflow Loop] Exception during auto-trigger: ${err.message}`);
+      resolve(false);
+    }
+  });
+}
+
 async function main() {
   const startTime = Date.now();
   console.log(`\n${'='.repeat(60)}`);
@@ -1713,7 +1763,32 @@ async function main() {
     // 1. Initialize Google API Clients
     initGoogleClients();
 
-    if (discoverMode) {
+    if (loopMode) {
+      console.log(`[Workflow Loop] Starting continuous daemon loop...`);
+      console.log(`[Workflow Loop] Interval: ${loopIntervalMs / 60000} minutes.`);
+      console.log(`[Workflow Loop] Safety limit: 330 minutes (5.5 hours).`);
+      
+      const loopStart = Date.now();
+      const maxDurationMs = 330 * 60 * 1000; // 5.5 hours
+
+      while (true) {
+        const elapsedMs = Date.now() - loopStart;
+        if (elapsedMs >= maxDurationMs) {
+          console.log(`[Workflow Loop] Loop duration reached 5.5 hours. Triggering next workflow run to prevent Actions timeout...`);
+          await triggerNextWorkflowRun();
+          // Wait 30 seconds for Github to register and start the new run
+          await new Promise(r => setTimeout(r, 30000));
+          console.log(`[Workflow Loop] Exiting current loop to transition to next run.`);
+          process.exit(0);
+        }
+
+        // Run full step (discover + process)
+        await runWorkflowStep();
+
+        console.log(`[Workflow Loop] Waiting for ${loopIntervalMs / 60000} minutes before next run...`);
+        await new Promise(r => setTimeout(r, loopIntervalMs));
+      }
+    } else if (discoverMode) {
       // Only discover new topics and add to queue
       await discoverAndQueueNews();
     } else if (processMode) {

@@ -26,20 +26,26 @@ const {
   GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI,
   SPREADSHEET_ID,
-  BLOG_ID
+  BLOG_ID,
+  ACTIONS_PAT
 } = process.env;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function httpsPost(url, payload) {
+function httpsPost(url, payload, headers = {}) {
   return new Promise((resolve) => {
     const data = JSON.stringify(payload);
     const urlObj = new URL(url);
     const req = https.request({
       hostname: urlObj.hostname,
-      path: urlObj.pathname + urlObj.search,
+      path: urlObj.pathname + (urlObj.search || ''),
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Content-Length': Buffer.byteLength(data),
+        'User-Agent': 'PitchWatch/1.0',
+        ...headers 
+      }
     }, (res) => {
       let body = '';
       res.on('data', c => body += c);
@@ -54,10 +60,14 @@ function httpsPost(url, payload) {
   });
 }
 
-function httpsGet(url) {
+function httpsGet(url, headers = {}) {
   return new Promise((resolve) => {
     const urlObj = new URL(url);
-    https.get({ hostname: urlObj.hostname, path: urlObj.pathname + urlObj.search }, (res) => {
+    https.get({ 
+      hostname: urlObj.hostname, 
+      path: urlObj.pathname + (urlObj.search || ''),
+      headers: { 'User-Agent': 'PitchWatch/1.0', ...headers }
+    }, (res) => {
       let body = '';
       res.on('data', c => body += c);
       res.on('end', () => resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, statusCode: res.statusCode, body }));
@@ -235,6 +245,60 @@ async function checkBloggerAPI() {
   }
 }
 
+
+async function checkLoopRunningAndRestart() {
+  console.log('[Monitor] Checking if always-on loop is running...');
+  if (!ACTIONS_PAT) {
+    console.warn('[Monitor] ACTIONS_PAT is missing in env — cannot check or restart loop workflow!');
+    return { ok: true };
+  }
+
+  const owner = 'shivam01579-cmd';
+  const repo = 'Pitch-Watch-website-';
+  const workflowId = 'news-poster.yml';
+  const runsUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowId}/runs?status=in_progress`;
+  
+  try {
+    const res = await httpsGet(runsUrl, {
+      'Authorization': `token ${ACTIONS_PAT}`,
+      'Accept': 'application/vnd.github.v3+json'
+    });
+
+    if (!res.ok) {
+      return { ok: false, message: `Failed to check workflow runs: HTTP ${res.statusCode}` };
+    }
+
+    const data = JSON.parse(res.body);
+    const inProgressRuns = data.workflow_runs || [];
+
+    console.log(`[Monitor] Found ${inProgressRuns.length} running loops.`);
+
+    if (inProgressRuns.length === 0) {
+      console.log(`[Monitor] ⚠️ No active loops found! Auto-triggering a new workflow loop run...`);
+      
+      const dispatchUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`;
+      const payload = { ref: 'main' };
+      
+      const dispatchRes = await httpsPost(dispatchUrl, payload, {
+        'Authorization': `token ${ACTIONS_PAT}`,
+        'Accept': 'application/vnd.github.v3+json'
+      });
+
+      if (dispatchRes.ok) {
+        await sendTelegramAlert('🔄 <b>Always-on loop auto-restarted!</b>\n\nPoster loop had stopped running, so Health Monitor triggered a fresh loop run successfully.', false);
+        return { ok: true };
+      } else {
+        return { ok: false, message: `Tried to auto-restart loop, but dispatch failed: HTTP ${dispatchRes.statusCode}` };
+      }
+    }
+
+    console.log(`[Monitor] ✅ Always-on loop is active (Run ID: ${inProgressRuns[0].id})`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: `Error checking/restarting loop: ${err.message}` };
+  }
+}
+
 // ─── Main Monitor Runner ────────────────────────────────────────────────────
 
 async function runHealthChecks() {
@@ -251,10 +315,11 @@ async function runHealthChecks() {
     checkGoogleTokens(),
     checkGoogleSheetsAPI(),
     checkQueueStatus(),
-    checkBloggerAPI()
+    checkBloggerAPI(),
+    checkLoopRunningAndRestart()
   ]);
 
-  const checkNames = ['Telegram Bot', 'Google Tokens', 'Google Sheets', 'Queue Status', 'Blogger API'];
+  const checkNames = ['Telegram Bot', 'Google Tokens', 'Google Sheets', 'Queue Status', 'Blogger API', 'Actions Loop Poster'];
 
   results.forEach((result, i) => {
     const name = checkNames[i];

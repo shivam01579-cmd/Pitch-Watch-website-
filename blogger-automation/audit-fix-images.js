@@ -442,6 +442,56 @@ function injectImageAtTop(html, imageUrl, caption) {
   return imageBlock + html;
 }
 
+async function logAuditFixToSheets(sheets, spreadsheetId, title, problemType, originalImg, sourceUrl, fixedImg, status) {
+  try {
+    const sheetName = 'ImageAuditLog';
+    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheetExists = meta.data.sheets.some(s => s.properties.title === sheetName);
+    
+    if (!sheetExists) {
+      console.log(`[Audit Log] Creating new sheet tab "${sheetName}" in Google Sheets...`);
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{
+            addSheet: {
+              properties: { title: sheetName }
+            }
+          }]
+        }
+      });
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${sheetName}!A1:G1`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [['Timestamp', 'Post Title', 'Problem Type', 'Original Image URL', 'Source URL', 'Fixed Image URL', 'Status']]
+        }
+      });
+    }
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${sheetName}!A:G`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[
+          new Date().toISOString(),
+          title,
+          problemType,
+          originalImg,
+          sourceUrl,
+          fixedImg,
+          status
+        ]]
+      }
+    });
+    console.log(`[Audit Log] Saved fix history to Google Sheets.`);
+  } catch (err) {
+    console.warn(`[Audit Log] Warning: Could not log to Google Sheets: ${err.message}`);
+  }
+}
+
 // ─── Main Audit Logic ────────────────────────────────────────────────────────
 
 async function auditAndFixImages() {
@@ -471,6 +521,7 @@ async function auditAndFixImages() {
   });
 
   const blogger = google.blogger({ version: 'v3', auth });
+  const sheetsClient = google.sheets({ version: 'v4', auth });
 
   console.log('[Audit] Fetching all posts from Blogger...');
   const allPosts = [];
@@ -520,11 +571,13 @@ async function auditAndFixImages() {
   for (let i = 0; i < allPosts.length; i++) {
     const post = allPosts[i];
     const postNum = `[${i + 1}/${allPosts.length}]`;
+    let problemType = null;
+    let firstImageUrl = null;
+    let inlineSourceUrl = null;
 
     try {
       const content = post.content || '';
-      const firstImageUrl = extractFirstImageUrl(content);
-      let problemType = null;
+      firstImageUrl = extractFirstImageUrl(content);
 
       if (!firstImageUrl) {
         problemType = 'NO_IMAGE';
@@ -588,12 +641,39 @@ async function auditAndFixImages() {
       fixedTitles.push(post.title?.slice(0, 60));
       console.log(`${postNum} ✅ FIXED: "${post.title?.slice(0, 50)}" → ${newImage.url.slice(0, 60)}...`);
 
+      if (SPREADSHEET_ID) {
+        await logAuditFixToSheets(
+          sheetsClient,
+          SPREADSHEET_ID,
+          post.title,
+          problemType,
+          firstImageUrl || 'NONE',
+          inlineSourceUrl || 'NONE',
+          newImage.url,
+          'RESOLVED'
+        );
+      }
+
       await new Promise(r => setTimeout(r, 600));
 
     } catch (err) {
       console.error(`${postNum} ❌ Error processing "${post.title?.slice(0, 40)}":`, err.message);
       stats.fixFailed++;
       failedTitles.push(post.title?.slice(0, 60) + ' [ERROR]');
+      if (SPREADSHEET_ID) {
+        try {
+          await logAuditFixToSheets(
+            sheetsClient,
+            SPREADSHEET_ID,
+            post.title,
+            problemType || 'UNKNOWN',
+            firstImageUrl || 'NONE',
+            inlineSourceUrl || 'NONE',
+            'NONE',
+            `FAILED: ${err.message}`
+          );
+        } catch (_) {}
+      }
     }
   }
 
