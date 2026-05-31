@@ -2,9 +2,9 @@ name: "🏏 Pitch Watch — Auto Post (Every 30 Min)"
 
 on:
   schedule:
-    # Every 30 minutes, 24x7, cloud pe — no PC needed!
+    # Every 30 minutes, 24x7 — GitHub cloud pe, no PC needed!
     - cron: '*/30 * * * *'
-  workflow_dispatch: # Manual trigger from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
   run-auto-poster:
@@ -23,17 +23,15 @@ jobs:
           cache-dependency-path: blogger-automation/package-lock.json
 
       - name: Install Dependencies
-        run: |
-          cd blogger-automation
-          npm ci
+        run: cd blogger-automation && npm ci
 
       - name: Restore Google OAuth tokens
         run: |
           cd blogger-automation
           echo '${{ secrets.TOKENS_JSON }}' > tokens.json
-          echo "[Setup] tokens.json restored from GitHub Secret."
+          echo "[Setup] tokens.json restored."
 
-      - name: Run Discover + Post Workflow
+      - name: Run Workflow (Discover + Post + Telegram)
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
@@ -50,12 +48,119 @@ jobs:
           FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
           FACEBOOK_PAGE_URL: ${{ secrets.FACEBOOK_PAGE_URL }}
           FACEBOOK_GROUPS: ${{ secrets.FACEBOOK_GROUPS }}
+        run: cd blogger-automation && node workflow.js
+
+      # ── AUTO TOKEN REFRESH ──────────────────────────────────
+      # After every run, save the (possibly refreshed) tokens back
+      # to GitHub Secrets so the next run always has fresh tokens.
+      - name: Auto-save refreshed OAuth tokens to GitHub Secret
+        if: always()
         run: |
           cd blogger-automation
-          node workflow.js
-          echo "[Done] Workflow run complete."
+          if [ ! -f tokens.json ]; then
+            echo "[Token Refresh] tokens.json not found, skipping."
+            exit 0
+          fi
 
-      - name: Upload share-assistant.html as artifact (optional debug)
+          pip install PyNaCl --quiet
+
+          python3 << 'PYEOF'
+          import json, base64, urllib.request, urllib.error
+          from nacl import encoding, public
+
+          PAT   = "${{ secrets.ACTIONS_PAT }}"
+          OWNER = "shivam01579-cmd"
+          REPO  = "Pitch-Watch-website-"
+
+          with open("tokens.json") as f:
+              tokens_json = f.read().strip()
+
+          # Get repo public key
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{OWNER}/{REPO}/actions/secrets/public-key",
+              headers={"Authorization": f"token {PAT}", "Accept": "application/vnd.github.v3+json", "User-Agent": "PitchWatch/1.0"}
+          )
+          with urllib.request.urlopen(req) as r:
+              key_data = json.loads(r.read())
+
+          key_id  = key_data["key_id"]
+          key_b64 = key_data["key"]
+
+          # Encrypt
+          pub_key   = public.PublicKey(key_b64.encode(), encoding.Base64Encoder())
+          sealed    = public.SealedBox(pub_key)
+          encrypted = base64.b64encode(sealed.encrypt(tokens_json.encode())).decode()
+
+          # Update secret
+          body = json.dumps({"encrypted_value": encrypted, "key_id": key_id}).encode()
+          req2 = urllib.request.Request(
+              f"https://api.github.com/repos/{OWNER}/{REPO}/actions/secrets/TOKENS_JSON",
+              data=body, method="PUT",
+              headers={"Authorization": f"token {PAT}", "Accept": "application/vnd.github.v3+json",
+                       "Content-Type": "application/json", "User-Agent": "PitchWatch/1.0"}
+          )
+          try:
+              with urllib.request.urlopen(req2) as r:
+                  print(f"[Token Refresh] ✅ TOKENS_JSON secret updated (HTTP {r.status})")
+          except urllib.error.HTTPError as e:
+              print(f"[Token Refresh] ⚠️ Update failed: {e.code} {e.reason}")
+          PYEOF
+
+      # ── AUTO-RETRY FAILED ARTICLES ──────────────────────────
+      # Every Sunday (run #0 of each week), reset FAILED → PENDING
+      # so stuck articles get retried automatically
+      - name: Auto-retry failed queue articles (weekly)
+        if: ${{ github.event.schedule == '*/30 * * * *' }}
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: |
+          cd blogger-automation
+          DAY=$(date +%u)  # 7 = Sunday
+          HOUR=$(date +%H)
+          MIN=$(date +%M)
+          # Run retry logic every Sunday at ~midnight UTC
+          if [ "$DAY" = "7" ] && [ "$HOUR" = "00" ]; then
+            echo "[Retry] Sunday midnight — resetting FAILED articles to PENDING..."
+            node << 'JSEOF'
+          import dotenv from 'dotenv';
+          dotenv.config();
+          import { google } from 'googleapis';
+          import fs from 'fs';
+
+          const tokens = JSON.parse(fs.readFileSync('tokens.json', 'utf8'));
+          const auth = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            process.env.GOOGLE_REDIRECT_URI
+          );
+          auth.setCredentials(tokens);
+          const sheets = google.sheets({ version: 'v4', auth });
+          const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
+
+          const res = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A2:D500'
+          });
+          const rows = res.data.values || [];
+          const failedRows = rows.map((r, i) => ({ row: i + 2, status: r[3] })).filter(r => r.status === 'FAILED');
+
+          for (const { row } of failedRows) {
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `Sheet1!D${row}`,
+              valueInputOption: 'USER_ENTERED',
+              requestBody: { values: [['PENDING']] }
+            });
+          }
+          console.log(`[Retry] Reset ${failedRows.length} FAILED articles to PENDING.`);
+          JSEOF
+          else
+            echo "[Retry] Not Sunday midnight — skipping retry step."
+          fi
+
+      - name: Upload share-assistant as artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
