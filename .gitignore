@@ -7,3 +7,4 @@ upload-to-github.js
 tokens.json
 **/tokens.json
 **/.env
+**/set-github-secrets.mjs
