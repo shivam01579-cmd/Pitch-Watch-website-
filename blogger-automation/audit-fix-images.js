@@ -48,8 +48,24 @@ const GENERIC_IMAGE_PATTERNS = [
   'espncricinfo.com/i/db/PICTURES/CMS/316700', // espn generic
   'hindustantimes.com/static-content',
   '1x1.gif', '1x1.png', 'spacer.gif',
-  'photo-1575361204480', // cricket ball close-up Unsplash (too generic)
+  // ── ALL curated Unsplash fallback images (stock photos, not article-specific) ──
+  'photo-1531415074968', // stadium lights
+  'photo-1593341606579', // batsman
+  'photo-1512412086890', // pitch wide
+  'photo-1589801258579', // floodlit evening
+  'photo-1508098682722', // crowd fans
+  'photo-1552664730-d307ca884978', // team huddle
+  'photo-1540747913346', // bowler action
+  'photo-1624880357913', // aerial view
+  'photo-1574629810360', // trophy celebration
+  'photo-1599474924187', // fielding
+  'photo-1575361204480', // cricket ball close-up
+  'photo-1629818651924', // equipment
+  'photo-1522778119026', // umpire
+  'photo-1569517282132', // india team
+  'photo-1606925797300', // T20 batting
 ];
+
 
 // Curated high-quality fallback cricket images (from workflow.js)
 const CURATED_CRICKET_IMAGES = [
