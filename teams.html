@@ -1,0 +1,366 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Cricket Teams Hub - Pitch Watch</title>
+<meta name="description" content="Explore your favorite cricket teams. Select from IPL franchises and the Indian national team to view dedicated news feeds.">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Hanken+Grotesk:wght@400;700;800&amp;family=Source+Serif+4:wght@400;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-low": "#f2f4f6",
+                        "on-tertiary": "#ffffff",
+                        "on-surface-variant": "#45464d",
+                        "surface-variant": "#e0e3e5",
+                        "on-background": "#191c1e",
+                        "tertiary-container": "#0d1c2f",
+                        "on-tertiary-fixed-variant": "#3a485c",
+                        "primary": "#000000",
+                        "on-tertiary-fixed": "#0d1c2f",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-primary-container": "#7c839b",
+                        "surface-tint": "#565e74",
+                        "on-tertiary-container": "#76859b",
+                        "surface-container-high": "#e6e8ea",
+                        "surface-bright": "#f7f9fb",
+                        "on-secondary-fixed-variant": "#005321",
+                        "inverse-primary": "#bec6e0",
+                        "error-container": "#ffdad6",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "on-secondary-container": "#007432",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface-container-highest": "#e0e3e5",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#bec6e0",
+                        "background": "#f7f9fb",
+                        "tertiary-fixed-dim": "#b9c7e0",
+                        "surface-container": "#eceef0",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-error": "#ffffff",
+                        "surface-dim": "#d8dadc",
+                        "secondary": "#006e2f",
+                        "inverse-surface": "#2d3133",
+                        "surface": "#f7f9fb",
+                        "on-secondary-fixed": "#002109",
+                        "secondary-fixed": "#6bff8f",
+                        "primary-container": "#131b2e",
+                        "on-secondary": "#ffffff",
+                        "tertiary": "#000000",
+                        "on-surface": "#191c1e",
+                        "outline": "#76777d",
+                        "primary-fixed": "#dae2fd",
+                        "on-primary-fixed": "#131b2e",
+                        "outline-variant": "#c6c6cd",
+                        "secondary-container": "#6bff8f",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed": "#d5e3fd"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "gutter": "20px",
+                        "xl": "64px",
+                        "sm": "16px",
+                        "xs": "8px",
+                        "container-max": "1280px",
+                        "base": "4px",
+                        "lg": "40px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Anton"],
+                        "meta-label": ["Hanken Grotesk"],
+                        "display-lg-mobile": ["Anton"],
+                        "display-lg": ["Anton"],
+                        "article-body": ["Source Serif 4"],
+                        "stats-number": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.2", "fontWeight": "400" }],
+                        "meta-label": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "display-lg-mobile": ["32px", { "lineHeight": "1.1", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "0.02em", "fontWeight": "400" }],
+                        "article-body": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "stats-number": ["20px", { "lineHeight": "1", "fontWeight": "800" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom styles for premium team hover glow effects */
+        .team-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .team-card:hover {
+            transform: translateY(-4px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased selection:bg-secondary-container selection:text-on-secondary-container min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<nav class="bg-surface-container-lowest border-b border-outline-variant sticky top-0 z-50 flex justify-between items-center px-gutter w-full max-w-container-max mx-auto h-16">
+<div class="flex items-center gap-md">
+<a class="font-headline-md text-headline-md uppercase tracking-tighter text-primary dark:text-on-background" href="index.html">Pitch Watch</a>
+<div class="hidden md:flex gap-sm">
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary font-meta-label text-meta-label uppercase px-xs py-base hover:bg-surface-container-low transition-colors duration-200" href="index.html?category=ipl">IPL</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary font-meta-label text-meta-label uppercase px-xs py-base hover:bg-surface-container-low transition-colors duration-200" href="index.html?category=india">India</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary font-meta-label text-meta-label uppercase px-xs py-base hover:bg-surface-container-low transition-colors duration-200" href="index.html?category=icc">ICC</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary font-meta-label text-meta-label uppercase px-xs py-base hover:bg-surface-container-low transition-colors duration-200" href="teams.html">Teams</a>
+</div>
+</div>
+<div class="flex items-center gap-sm">
+<button aria-label="Search" class="p-xs rounded-full hover:bg-surface-container-low transition-colors text-primary">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button aria-label="Account" class="p-xs rounded-full hover:bg-surface-container-low transition-colors text-primary">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</nav>
+
+<!-- Main Page Layout -->
+<main class="flex-grow w-full max-w-container-max mx-auto px-gutter py-md">
+<!-- Header Section -->
+<header class="mb-lg border-b border-primary pb-sm flex flex-col md:flex-row md:items-end justify-between gap-sm">
+<div>
+<h1 class="font-display-lg text-display-lg text-primary uppercase">Teams Hub</h1>
+<p class="font-meta-label text-sm text-on-surface-variant mt-xs">Select your team to view dedicated latest news, statistics, and reviews.</p>
+</div>
+<span class="font-meta-label text-meta-label bg-secondary text-on-secondary px-sm py-xs uppercase">11 Teams Coverage</span>
+</header>
+
+<!-- Teams Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-md" id="teams-grid">
+<!-- Team India -->
+<a href="team-news.html?team=india" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#0F52BA] transition-all duration-300">
+<div class="h-28 w-full bg-[#0F52BA]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#0F52BA]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#0F52BA]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#0F52BA] uppercase tracking-wider relative z-10">India</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#0F52BA] transition-colors uppercase">Team India</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">National Men's and Women's Cricket Teams</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>National Side</span>
+<span class="text-[#0F52BA] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+
+<!-- Chennai Super Kings -->
+<a href="team-news.html?team=csk" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#F9CD05] transition-all duration-300">
+<div class="h-28 w-full bg-[#F9CD05]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#F9CD05]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#F9CD05]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#F9CD05] uppercase tracking-wider relative z-10 filter drop-shadow">CSK</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#E2B700] transition-colors uppercase">Chennai Super Kings</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">5-Time IPL Champions & Super Kings Franchise</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>IPL Franchise</span>
+<span class="text-[#E2B700] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+
+<!-- Mumbai Indians -->
+<a href="team-news.html?team=mi" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#004B87] transition-all duration-300">
+<div class="h-28 w-full bg-[#004B87]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#004B87]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#004B87]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#004B87] uppercase tracking-wider relative z-10">MI</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#004B87] transition-colors uppercase">Mumbai Indians</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">5-Time IPL Champions, Wankhede home</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>IPL Franchise</span>
+<span class="text-[#004B87] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+
+<!-- Royal Challengers Bengaluru -->
+<a href="team-news.html?team=rcb" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#EC1C24] transition-all duration-300">
+<div class="h-28 w-full bg-[#EC1C24]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#EC1C24]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#EC1C24]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#EC1C24] uppercase tracking-wider relative z-10">RCB</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#EC1C24] transition-colors uppercase">Royal Challengers Bengaluru</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">IPL 2025 Champions & Defending Finalists</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>IPL Franchise</span>
+<span class="text-[#EC1C24] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+
+<!-- Gujarat Titans -->
+<a href="team-news.html?team=gt" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#0B2265] transition-all duration-300">
+<div class="h-28 w-full bg-[#0B2265]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#0B2265]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#0B2265]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#0B2265] uppercase tracking-wider relative z-10">GT</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#0B2265] transition-colors uppercase">Gujarat Titans</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">IPL 2022 Champions & 2026 Finalists</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>IPL Franchise</span>
+<span class="text-[#0B2265] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+
+<!-- Rajasthan Royals -->
+<a href="team-news.html?team=rr" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#EA1B85] transition-all duration-300">
+<div class="h-28 w-full bg-[#EA1B85]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#EA1B85]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#EA1B85]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#EA1B85] uppercase tracking-wider relative z-10">RR</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#EA1B85] transition-colors uppercase">Rajasthan Royals</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">Inaugural IPL Champions, Pink City Royals</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>IPL Franchise</span>
+<span class="text-[#EA1B85] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+
+<!-- Sunrisers Hyderabad -->
+<a href="team-news.html?team=srh" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#F26522] transition-all duration-300">
+<div class="h-28 w-full bg-[#F26522]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#F26522]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#F26522]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#F26522] uppercase tracking-wider relative z-10">SRH</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#F26522] transition-colors uppercase">Sunrisers Hyderabad</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">IPL 2016 Champions & Playoff Contenders</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>IPL Franchise</span>
+<span class="text-[#F26522] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+
+<!-- Kolkata Knight Riders -->
+<a href="team-news.html?team=kkr" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#3A225D] transition-all duration-300">
+<div class="h-28 w-full bg-[#3A225D]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#3A225D]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#3A225D]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#3A225D] uppercase tracking-wider relative z-10">KKR</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#3A225D] transition-colors uppercase">Kolkata Knight Riders</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">3-Time IPL Champions, Eden Gardens home</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>IPL Franchise</span>
+<span class="text-[#3A225D] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+
+<!-- Delhi Capitals -->
+<a href="team-news.html?team=dc" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#0078BC] transition-all duration-300">
+<div class="h-28 w-full bg-[#0078BC]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#0078BC]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#0078BC]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#0078BC] uppercase tracking-wider relative z-10">DC</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#0078BC] transition-colors uppercase">Delhi Capitals</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">IPL Finalists, Feroz Shah Kotla home</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>IPL Franchise</span>
+<span class="text-[#0078BC] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+
+<!-- Punjab Kings -->
+<a href="team-news.html?team=pbks" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#ED1B24] transition-all duration-300">
+<div class="h-28 w-full bg-[#ED1B24]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#ED1B24]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#ED1B24]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#ED1B24] uppercase tracking-wider relative z-10">PBKS</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#ED1B24] transition-colors uppercase">Punjab Kings</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">IPL Finalists, Mohali/Dharamshala home</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>IPL Franchise</span>
+<span class="text-[#ED1B24] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+
+<!-- Lucknow Super Giants -->
+<a href="team-news.html?team=lsg" class="team-card group relative flex flex-col bg-surface-container-lowest border border-outline-variant rounded-DEFAULT p-sm hover:shadow-lg hover:border-[#0057E7] transition-all duration-300">
+<div class="h-28 w-full bg-[#0057E7]/10 rounded-DEFAULT flex items-center justify-center relative overflow-hidden mb-sm border border-[#0057E7]/20">
+<div class="absolute inset-0 bg-gradient-to-tr from-[#0057E7]/25 to-transparent"></div>
+<span class="font-headline-md text-3xl text-[#0057E7] uppercase tracking-wider relative z-10">LSG</span>
+</div>
+<h3 class="font-meta-label text-md text-primary font-bold group-hover:text-[#0057E7] transition-colors uppercase">Lucknow Super Giants</h3>
+<p class="font-meta-label text-xs text-on-surface-variant mt-xs">IPL Playoff qualifiers, Lucknow home</p>
+<div class="mt-sm flex justify-between items-center text-[10px] uppercase font-meta-label text-on-surface-variant pt-xs border-t border-outline-variant">
+<span>IPL Franchise</span>
+<span class="text-[#0057E7] font-bold group-hover:underline">View News &rarr;</span>
+</div>
+</a>
+</div>
+</main>
+
+<!-- Footer -->
+<footer class="bg-surface-container-highest dark:bg-surface-container-highest border-t border-outline-variant w-full py-xl px-gutter mt-auto text-primary">
+  <div class="max-w-container-max mx-auto grid grid-cols-1 md:grid-cols-4 gap-lg">
+    <div class="col-span-1 md:col-span-1">
+      <h2 class="font-headline-md text-headline-md text-primary mb-sm">Pitch Watch</h2>
+      <p class="font-meta-label text-meta-label text-on-surface-variant leading-relaxed">High-Performance Cricket Journalism. Data-driven analysis, live updates, and editorial excellence.</p>
+    </div>
+    <div class="col-span-1 md:col-span-3 flex flex-wrap justify-between gap-lg">
+      <nav class="flex flex-col gap-sm">
+        <a class="font-meta-label text-meta-label text-on-surface-variant hover:text-secondary hover:underline decoration-secondary cursor-pointer transition-all" href="sitemap.html">Sitemap</a>
+        <a class="font-meta-label text-meta-label text-on-surface-variant hover:text-secondary hover:underline decoration-secondary cursor-pointer transition-all" href="privacy-policy.html">Privacy Policy</a>
+        <a class="font-meta-label text-meta-label text-on-surface-variant hover:text-secondary hover:underline decoration-secondary cursor-pointer transition-all" href="terms-of-service.html">Terms of Service</a>
+      </nav>
+      <nav class="flex flex-col gap-sm">
+        <span class="font-meta-label text-meta-label text-primary font-bold">Inquiries</span>
+        <a class="font-meta-label text-meta-label text-on-surface-variant hover:text-secondary hover:underline decoration-secondary cursor-pointer transition-all" href="contact.html">Contact Us</a>
+      </nav>
+      <div class="flex flex-col gap-sm min-w-[200px]">
+        <span class="font-meta-label text-meta-label text-primary font-bold">Subscribe to Premium</span>
+        <form class="flex" onsubmit="event.preventDefault(); alert('Thank you for subscribing to Pitch Watch!'); this.reset();">
+          <input aria-label="Email for newsletter" required class="bg-surface-container-lowest border-b border-outline-variant focus:border-secondary focus:ring-0 px-0 py-xs text-sm w-full font-meta-label bg-transparent outline-none transition-colors" placeholder="Email address" type="email">
+          <button aria-label="Submit" type="submit" class="bg-primary text-on-primary font-meta-label text-meta-label uppercase px-sm py-xs hover:bg-secondary transition-colors">Go</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="max-w-container-max mx-auto mt-xl pt-sm border-t border-outline-variant text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-sm">
+    <p class="font-meta-label text-meta-label text-on-surface-variant">© 2026 Pitch Watch. High-Performance Cricket Journalism.</p>
+    <p class="font-meta-label text-[10px] text-on-surface-variant/70">Disclaimer: Pitch Watch is a mock sports news portal for demonstration purposes. All news articles are paraphrased/fictionalized.</p>
+  </div>
+</footer>
+
+<!-- Interactive Scripts -->
+<script>
+  // Theme management
+  function initTheme() {
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
+  initTheme();
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Add Dark Mode button dynamically
+    const navbar = document.querySelector('nav .flex.items-center.gap-sm');
+    const themeBtn = document.createElement('button');
+    themeBtn.setAttribute('aria-label', 'Toggle Theme');
+    themeBtn.className = 'p-1.5 rounded-full hover:bg-surface-container-low transition-colors text-primary flex items-center justify-center';
+    themeBtn.innerHTML = `<span class="material-symbols-outlined text-[20px]">dark_mode</span>`;
+    themeBtn.onclick = () => {
+      if (document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.remove('dark');
+        localStorage.theme = 'light';
+      } else {
+        document.documentElement.classList.add('dark');
+        localStorage.theme = 'dark';
+      }
+    };
+    navbar.insertBefore(themeBtn, navbar.firstChild);
+  });
+</script>
+</body></html>
