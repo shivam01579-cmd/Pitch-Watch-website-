@@ -1,9 +1,10 @@
-name: "🏏 Pitch Watch — Auto Post (Every 30 Min)"
+name: "🏏 Pitch Watch — Auto Post (Prime Times)"
 
 on:
   schedule:
-    # Every 30 minutes, 24x7 — GitHub cloud pe, no PC needed!
-    - cron: '*/30 * * * *'
+    # Every 2 hours during Indian prime-time (6:00 AM to 12:00 AM IST)
+    # 0:30 UTC to 18:30 UTC
+    - cron: '30 0,2,4,6,8,10,12,14,16,18 * * *'
   workflow_dispatch:
 
 jobs:
@@ -49,7 +50,7 @@ jobs:
           FACEBOOK_PAGE_URL: ${{ secrets.FACEBOOK_PAGE_URL }}
           FACEBOOK_GROUPS: ${{ secrets.FACEBOOK_GROUPS }}
           ACTIONS_PAT: ${{ secrets.ACTIONS_PAT }}
-        run: cd blogger-automation && node workflow.js --loop --interval=20
+        run: cd blogger-automation && node workflow.js
 
       # ── AUTO TOKEN REFRESH ──────────────────────────────────
       # After every run, save the (possibly refreshed) tokens back

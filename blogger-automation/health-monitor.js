@@ -315,11 +315,10 @@ async function runHealthChecks() {
     checkGoogleTokens(),
     checkGoogleSheetsAPI(),
     checkQueueStatus(),
-    checkBloggerAPI(),
-    checkLoopRunningAndRestart()
+    checkBloggerAPI()
   ]);
 
-  const checkNames = ['Telegram Bot', 'Google Tokens', 'Google Sheets', 'Queue Status', 'Blogger API', 'Actions Loop Poster'];
+  const checkNames = ['Telegram Bot', 'Google Tokens', 'Google Sheets', 'Queue Status', 'Blogger API'];
 
   results.forEach((result, i) => {
     const name = checkNames[i];
