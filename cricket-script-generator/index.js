@@ -410,10 +410,28 @@ ${headlinesList}
 Please review the stories, select the absolute best candidate for a viral 2-minute video, and generate the JSON package exactly as specified.
 `;
 
-    const result = await model.generateContent([
-      { text: systemInstruction },
-      { text: prompt }
-    ]);
+    let result;
+    let attempts = 0;
+    const maxAttempts = 3;
+    const retryDelayMs = 45000; // 45 seconds
+
+    while (attempts < maxAttempts) {
+      try {
+        result = await model.generateContent([
+          { text: systemInstruction },
+          { text: prompt }
+        ]);
+        break; // Success, break the loop
+      } catch (geminiErr) {
+        attempts++;
+        if (geminiErr.status === 429 && attempts < maxAttempts) {
+          console.warn(`[Gemini] Rate limited (429). Retrying attempt ${attempts}/${maxAttempts} in ${retryDelayMs / 1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+        } else {
+          throw geminiErr; // Rethrow if not a 429 or max attempts reached
+        }
+      }
+    }
 
     const responseText = result.response.text();
     console.log('Gemini raw response received.');
