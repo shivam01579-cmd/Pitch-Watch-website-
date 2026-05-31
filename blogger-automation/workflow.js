@@ -1236,9 +1236,12 @@ async function processNextPendingTopic() {
         result = await model.generateContent(prompt);
         break;
       } catch (err) {
-        if ((err.status === 503 || err.message.includes('503')) && retries > 1) {
-          console.warn(`[Gemini] 503 Service Unavailable. Retrying in 5 seconds... (${retries - 1} retries left)`);
-          await new Promise(r => setTimeout(r, 5000));
+        const is503 = err.status === 503 || err.message.includes('503');
+        const is429 = err.status === 429 || err.message.includes('429');
+        if ((is503 || is429) && retries > 1) {
+          const delay = is429 ? 45000 : 5000;
+          console.warn(`[Gemini] Error ${err.status || 'Request'}. Retrying in ${delay / 1000} seconds... (${retries - 1} retries left)`);
+          await new Promise(r => setTimeout(r, delay));
           retries--;
         } else {
           throw err;

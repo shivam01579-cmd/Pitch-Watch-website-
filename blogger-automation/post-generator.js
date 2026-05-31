@@ -269,7 +269,25 @@ async function generatePostContent() {
       - Inject a fictionalized or realistic expert quote block (<blockquote>) relevant to the topic.
     `;
     
-    const result = await model.generateContent(prompt);
+    let result = null;
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        result = await model.generateContent(prompt);
+        break;
+      } catch (err) {
+        const is503 = err.status === 503 || err.message.includes('503');
+        const is429 = err.status === 429 || err.message.includes('429');
+        if ((is503 || is429) && retries > 1) {
+          const delay = is429 ? 45000 : 5000;
+          console.warn(`[Gemini] Error ${err.status || 'Request'}. Retrying in ${delay / 1000} seconds... (${retries - 1} retries left)`);
+          await new Promise(r => setTimeout(r, delay));
+          retries--;
+        } else {
+          throw err;
+        }
+      }
+    }
     const content = result.response.text();
     
     // Clean up title (remove trailing publisher names like "- ESPNcricinfo")
