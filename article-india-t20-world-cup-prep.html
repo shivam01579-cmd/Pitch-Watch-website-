@@ -103,6 +103,35 @@
     </style>
 </head>
 <body class="bg-background text-on-background antialiased selection:bg-secondary-container selection:text-on-secondary-container min-h-screen flex flex-col">
+<!-- Top Utility Bar -->
+<div class="bg-surface-container-low border-b border-outline-variant/30 text-on-surface-variant w-full py-1.5 px-gutter text-xs font-meta-label">
+  <div class="max-w-container-max mx-auto flex justify-between items-center">
+    <div class="flex flex-wrap gap-x-4 gap-y-1">
+      <a class="hover:text-primary transition-colors" href="index.html">Home</a>
+      <span class="text-outline-variant/40">|</span>
+      <a class="hover:text-primary transition-colors" href="about.html">About Us</a>
+      <span class="text-outline-variant/40">|</span>
+      <a class="hover:text-primary transition-colors" href="contact.html">Contact Us</a>
+      <span class="text-outline-variant/40">|</span>
+      <a class="hover:text-primary transition-colors" href="privacy-policy.html">Privacy Policy</a>
+      <span class="text-outline-variant/40">|</span>
+      <a class="hover:text-primary transition-colors" href="terms-of-service.html">Terms of Service</a>
+    </div>
+    <div class="hidden sm:flex items-center gap-2 text-on-surface-variant/80">
+      <span class="material-symbols-outlined text-[14px]">event</span>
+      <span class="text-[11px] current-date-ticker">May 31, 2026</span>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const tickers = document.querySelectorAll('.current-date-ticker');
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    const dateStr = new Date().toLocaleDateString('en-US', options);
+    tickers.forEach(t => t.textContent = dateStr);
+  });
+</script>
+<!-- Top Utility Bar End -->
 <!-- TopNavBar -->
 <nav class="bg-surface-container-lowest border-b border-outline-variant sticky top-0 z-50 flex justify-between items-center px-gutter w-full max-w-container-max mx-auto h-16">
 <div class="flex items-center gap-md">
@@ -149,7 +178,7 @@
 <!-- Meta Data -->
 <div class="flex flex-wrap items-center justify-between border-y border-outline-variant py-sm mb-md gap-sm">
 <div class="flex items-center gap-sm">
-<img alt="Author Avatar" class="w-10 h-10 rounded-full object-cover border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDw8roz8j6j6wWXX3vx-JpPI27QYrNZlirY7Y6XmcJ-zIelA4OJoGiclkj7BCs_mdgOS7NVWmQ0zPrD2V3rs25C0WESGqLkba9fG1UXBZKlInlH0BaJSRRmUmsYJVcoIDyHC-A9BJMiCOSAwDNWnzdtObYLoTVDvPDC9EE6NfbpAmnBsv696Xdw6rlDHFMlhI_pO7vz_Hso7KFjymnl1FsoETZWavNydIwnt9H-ObB3F5mko3ck6qOvxTOq12fbnWE0FXlPny8IpN4T">
+<img alt="Author Avatar" class="w-10 h-10 rounded-full object-cover border border-outline-variant" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%230d1c2f'/%3E%3Ctext x='20' y='25' font-family='Arial%2C sans-serif' font-size='14' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3EPW%3C/text%3E%3C/svg%3E">
 <div>
 <p class="font-meta-label text-meta-label text-primary uppercase">Staff Writer</p>
 <p class="font-meta-label text-meta-label text-on-surface-variant">May 31, 2026 • 5 min read</p>
@@ -227,7 +256,7 @@
   <div class="border border-outline-variant p-xs relative bg-surface-container-lowest mb-lg">
     <span class="absolute top-0 left-0 bg-surface-container-low text-on-surface-variant font-meta-label text-[10px] uppercase px-xs py-base border-b border-r border-outline-variant z-10">Sponsored</span>
     <div class="w-full h-[250px] bg-surface-container flex items-center justify-center text-on-surface-variant relative overflow-hidden">
-      <img alt="Finance Ad" class="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-multiply" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEK2srA5Nx7JDrwxlJRKdPT_dV3kB_EFHQXALvE6wpMsxlKlKFCTjgnN9QeCbyS4lERNSTaJ7M_OgdXQZ9HZ_dfFLRmqiAlNV6uB6rqCuaYxrabHfRZ5WDMkARXMzxnyrXlZ-UfI_Y-z0jvzXmiknHRPSCHtlZjbmW7KXsSdLCNMF8tQGkNIXBAgbB-kV1mllwLuB3jVO6bv-pRo4LOqRyU3mgasu3CGF3wIgWmpl2R-UX7FgUY9uYbpG-1dQP6BLRu-z46PtSJCZB">
+      <img alt="Finance Ad" class="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-multiply" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='250' viewBox='0 0 400 250'%3E%3Crect width='400' height='250' fill='%230d1c2f'/%3E%3Ctext x='200' y='115' font-family='Arial%2Csans-serif' font-size='22' font-weight='bold' fill='%23006e2f' text-anchor='middle'%3ETrade Smarter%3C/text%3E%3Ctext x='200' y='145' font-family='Arial%2Csans-serif' font-size='12' fill='%23ffffff' text-anchor='middle'%3EMarkets %7C Analytics %7C Portfolio%3C/text%3E%3C/svg%3E">
       <span class="font-headline-md text-xl relative z-10 text-white drop-shadow-md">Trade Smarter</span>
     </div>
   </div>

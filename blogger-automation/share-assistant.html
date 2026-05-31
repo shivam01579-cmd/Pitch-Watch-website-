@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pitch Watch Share Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1329;
+      --card-bg: rgba(26, 38, 57, 0.65);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --accent: #f43f5e;
+      --success: #10b981;
+      --font: 'Outfit', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: radial-gradient(circle at 10% 20%, rgba(4, 21, 45, 1) 0%, rgba(11, 19, 41, 1) 90%);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 800px;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 25px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+    }
+
+    header h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #38bdf8 0%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 5px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .meta-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--primary);
+      border-radius: 30px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 15px;
+    }
+
+    .section {
+      margin-bottom: 25px;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .post-info-card {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .post-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .post-link-display {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      word-break: break-all;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .copy-box {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 15px;
+      position: relative;
+    }
+
+    .copy-box-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .copy-content-box {
+      font-size: 0.95rem;
+      color: var(--text);
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      background: rgba(0, 0, 0, 0.15);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      margin-bottom: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+      text-decoration: none;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #0b1329;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--primary);
+    }
+
+    .btn-facebook {
+      background: #1877f2;
+      color: white;
+    }
+
+    .btn-facebook:hover {
+      background: #166fe5;
+      box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3);
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    @media (min-width: 600px) {
+      .btn-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .groups-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .group-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.15);
+      border: 1px solid var(--border);
+      padding: 12px 18px;
+      border-radius: 10px;
+    }
+
+    .group-name {
+      font-size: 0.9rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 70%;
+    }
+
+    .group-btn {
+      width: auto;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--success);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Tips box styling */
+    .tips-callout {
+      background: rgba(244, 63, 94, 0.05);
+      border-left: 4px solid var(--accent);
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 15px;
+      font-size: 0.85rem;
+    }
+
+    .tips-callout strong {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="meta-badge">Facebook Reach Hack</div>
+      <h1>Pitch Watch Share Assistant</h1>
+      <p>Easily post engaging updates and drive traffic from your Facebook page & groups.</p>
+    </header>
+
+    <div class="section">
+      <div class="section-title">📌 Published Post Details</div>
+      <div class="post-info-card">
+        <div class="post-title">India's Asian Games Squad Shock: 15-Year-Old Wonderkid In; Iyer-Samson Captaincy War</div>
+        <div class="post-link-display" id="post-link">https://crickettrendsnews.blogspot.com/2026/05/dry-run-cricket-article.html</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">📋 Copy Engagement Content</div>
+      
+      <!-- Facebook Caption Copy Box -->
+      <div class="copy-box">
+        <div class="copy-box-label">Engaging Caption (Optimized for Facebook)</div>
+        <div class="copy-content-box" id="fb-caption">Suryavanshi at just 15 in Team India squad?! 🤯 Shreyas Iyer ya Sanju Samson—kise banna chahiye Asian Games ka captain? Selectors ne badi list tayar kar di hai aur dono bade naam captaincy ki race me aage chal rahe hain! Aapka kya kehna hai, kiski captaincy me India gold medal layega? Pura detail aur Dream11 Team analysis comments me hai! 👇</div>
+        <button class="btn btn-primary" onclick="copyText('fb-caption', 'Caption copied to clipboard!')">Copy Caption</button>
+      </div>
+
+      <!-- Blogger Link Copy Box -->
+      <div class="copy-box">
+        <div class="copy-box-label">Blogger Post Link (To paste in the Comments!)</div>
+        <div class="copy-content-box" style="white-space: nowrap; overflow-x: auto; max-height: 60px;" id="blogger-link">https://crickettrendsnews.blogspot.com/2026/05/dry-run-cricket-article.html</div>
+        <button class="btn btn-outline" onclick="copyText('blogger-link', 'Blogger link copied!')">Copy Blogger Link</button>
+      </div>
+
+      
+      <!-- YouTube Embed Copy Box -->
+      <div class="copy-box" style="border-color: rgba(168, 85, 247, 0.3);">
+        <div class="copy-box-label" style="color: #a855f7;">Matched YouTube Video (Optional Promo)</div>
+        <div style="font-size:0.85rem; margin-bottom:8px; color: var(--text-muted);"><strong>Video Title:</strong> Vaibhav Suryavanshi Team India Call-Up Soon? RR Coach BIG Statement | Sai Sudharsan Viral Meme 😂</div>
+        <div class="copy-content-box" style="white-space: nowrap; overflow-x: auto; max-height: 60px;" id="youtube-link">https://www.youtube.com/watch?v=wyB_ei2kBsk</div>
+        <button class="btn btn-outline" style="border-color: #a855f7; color: #d8b4fe;" onclick="copyText('youtube-link', 'YouTube link copied!')">Copy YouTube Link</button>
+      </div>
+
+      <div class="tips-callout">
+        📢 <strong>PRO GROWTH HACK:</strong> Do <strong>NOT</strong> put the blog link inside your Facebook post text! Facebook's reach algorithm penalizes outbound links. Instead:
+        <br>1. Copy the <strong>Caption</strong> and post it on your Page or in Groups.
+        <br>2. Immediately comment on your own post with the <strong>Blogger Post Link</strong>.
+        <br>This keeps your post reach high and gets maximum clicks!
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">🌐 Step 1: Post to Your Page</div>
+      <a href="https://www.facebook.com/MrMomentum03" target="_blank" class="btn btn-facebook">
+        Open My Facebook Page
+      </a>
+    </div>
+
+    <div class="section">
+      <div class="section-title">👥 Step 2: Share in Cricket Groups</div>
+      <div class="groups-list">
+        
+          <div class="group-item">
+            <div class="group-name">Group #1: <strong>708601629943742</strong></div>
+            <a href="https://www.facebook.com/groups/708601629943742/" target="_blank" class="btn btn-outline group-btn">Open Group</a>
+          </div>
+          <div class="group-item">
+            <div class="group-name">Group #2: <strong>sharevlog</strong></div>
+            <a href="https://www.facebook.com/groups/sharevlog/" target="_blank" class="btn btn-outline group-btn">Open Group</a>
+          </div>
+          <div class="group-item">
+            <div class="group-name">Group #3: <strong>adsenserockers</strong></div>
+            <a href="https://www.facebook.com/groups/adsenserockers" target="_blank" class="btn btn-outline group-btn">Open Group</a>
+          </div>
+          <div class="group-item">
+            <div class="group-name">Group #4: <strong>208885624000585</strong></div>
+            <a href="https://www.facebook.com/groups/208885624000585" target="_blank" class="btn btn-outline group-btn">Open Group</a>
+          </div>
+          <div class="group-item">
+            <div class="group-name">Group #5: <strong>148326591939692</strong></div>
+            <a href="https://www.facebook.com/groups/148326591939692" target="_blank" class="btn btn-outline group-btn">Open Group</a>
+          </div>
+          <div class="group-item">
+            <div class="group-name">Group #6: <strong>shareyourblogpostss</strong></div>
+            <a href="https://www.facebook.com/groups/shareyourblogpostss" target="_blank" class="btn btn-outline group-btn">Open Group</a>
+          </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied to clipboard!</div>
+
+  <script>
+    function copyText(elementId, successMsg) {
+      const text = document.getElementById(elementId).innerText || document.getElementById(elementId).textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(successMsg);
+      }).catch(err => {
+        console.error('Could not copy text: ', err);
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          showToast(successMsg);
+        } catch (e) {
+          alert('Failed to copy. Please manually select and copy.');
+        }
+        document.body.removeChild(textarea);
+      });
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.innerText = message;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+  </script>
+</body>
+</html>

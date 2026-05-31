@@ -8,6 +8,49 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// ============================================================
+// PITCH WATCH IMAGE POLICY
+// All articles must use local images or SVG data URIs.
+// lh3.googleusercontent.com/aida-public/ URLs are BANNED
+// because they expire and show broken images in production.
+// ============================================================
+
+// Reusable SVG placeholders (stable, no external dependency)
+const AUTHOR_AVATAR_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%230d1c2f'/%3E%3Ctext x='20' y='25' font-family='Arial%2C sans-serif' font-size='14' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3EPW%3C/text%3E%3C/svg%3E`;
+
+const GENERIC_CRICKET_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1280' height='720' viewBox='0 0 1280 720'%3E%3Crect width='1280' height='720' fill='%230d1c2f'/%3E%3Ccircle cx='640' cy='360' r='280' fill='none' stroke='%23006e2f' stroke-width='3' stroke-dasharray='12 6' opacity='0.6'/%3E%3Ccircle cx='640' cy='360' r='180' fill='none' stroke='%23006e2f' stroke-width='2' opacity='0.4'/%3E%3Crect x='620' y='200' width='40' height='140' fill='%23bec6e0' rx='4' opacity='0.8'/%3E%3Ctext x='640' y='160' font-family='Arial%2Csans-serif' font-size='28' font-weight='bold' fill='%23ffffff' text-anchor='middle' opacity='0.9'%3EPITCH WATCH%3C/text%3E%3Ctext x='640' y='195' font-family='Arial%2Csans-serif' font-size='13' fill='%234ae176' text-anchor='middle' letter-spacing='4'%3EHIGH-PERFORMANCE CRICKET JOURNALISM%3C/text%3E%3C/svg%3E`;
+
+const FINANCE_AD_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='250' viewBox='0 0 400 250'%3E%3Crect width='400' height='250' fill='%230d1c2f'/%3E%3Ctext x='200' y='115' font-family='Arial%2Csans-serif' font-size='22' font-weight='bold' fill='%23006e2f' text-anchor='middle'%3ETrade Smarter%3C/text%3E%3Ctext x='200' y='145' font-family='Arial%2Csans-serif' font-size='12' fill='%23ffffff' text-anchor='middle'%3EMarkets %7C Analytics %7C Portfolio%3C/text%3E%3C/svg%3E`;
+
+/**
+ * Sanitizes HTML content to strip all lh3.googleusercontent.com/aida-public
+ * AI-generated image URLs and replace with stable SVG alternatives.
+ * This is a permanent policy — never allow AI image URLs in published content.
+ */
+function stripAIImages(html) {
+  // Replace Author Avatar AI images
+  html = html.replace(
+    /(<img[^>]*alt="Author Avatar"[^>]*src=")https:\/\/lh3\.googleusercontent\.com\/aida-public\/[^"]*("|[^>]*>)/g,
+    `$1${AUTHOR_AVATAR_SVG}$2`
+  );
+  // Replace Finance Ad AI images
+  html = html.replace(
+    /(<img[^>]*alt="Finance Ad"[^>]*src=")https:\/\/lh3\.googleusercontent\.com\/aida-public\/[^"]*("|[^>]*>)/g,
+    `$1${FINANCE_AD_SVG}$2`
+  );
+  // Replace featured (aspect-video) AI images
+  html = html.replace(
+    /(<img[^>]*class="[^"]*aspect-video[^"]*"[^>]*src=")https:\/\/lh3\.googleusercontent\.com\/aida-public\/[^"]*("|[^>]*>)/g,
+    `$1${GENERIC_CRICKET_SVG}$2`
+  );
+  // Generic catch-all: replace any remaining lh3.googleusercontent.com/aida-public URLs
+  html = html.replace(
+    /https:\/\/lh3\.googleusercontent\.com\/aida-public\/[A-Za-z0-9_-]+/g,
+    GENERIC_CRICKET_SVG
+  );
+  return html;
+}
+
 const {
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
@@ -131,6 +174,9 @@ async function generatePostContent() {
         // Keep blockquote but ensure proper formatting
         return match;
       });
+    
+    // Strip all AI image URLs (policy: no lh3.googleusercontent.com/aida-public URLs)
+    content = stripAIImages(content);
       
     // Extract tags/topics
     const tags = [];
@@ -202,7 +248,7 @@ async function generatePostContent() {
     
     console.log('Requesting Gemini to write an HTML blog post based on target topic...');
     const ai = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = ai.getGenerativeModel({ model: 'gemini-flash-latest' });
     
     const prompt = `
       You are a premium sports journalist writing for Pitch Watch, an analytical cricket news portal.

@@ -103,6 +103,35 @@
     </style>
 </head>
 <body class="bg-background text-on-background antialiased selection:bg-secondary-container selection:text-on-secondary-container min-h-screen flex flex-col">
+<!-- Top Utility Bar -->
+<div class="bg-surface-container-low border-b border-outline-variant/30 text-on-surface-variant w-full py-1.5 px-gutter text-xs font-meta-label">
+  <div class="max-w-container-max mx-auto flex justify-between items-center">
+    <div class="flex flex-wrap gap-x-4 gap-y-1">
+      <a class="hover:text-primary transition-colors" href="index.html">Home</a>
+      <span class="text-outline-variant/40">|</span>
+      <a class="hover:text-primary transition-colors" href="about.html">About Us</a>
+      <span class="text-outline-variant/40">|</span>
+      <a class="hover:text-primary transition-colors" href="contact.html">Contact Us</a>
+      <span class="text-outline-variant/40">|</span>
+      <a class="hover:text-primary transition-colors" href="privacy-policy.html">Privacy Policy</a>
+      <span class="text-outline-variant/40">|</span>
+      <a class="hover:text-primary transition-colors" href="terms-of-service.html">Terms of Service</a>
+    </div>
+    <div class="hidden sm:flex items-center gap-2 text-on-surface-variant/80">
+      <span class="material-symbols-outlined text-[14px]">event</span>
+      <span class="text-[11px] current-date-ticker">May 31, 2026</span>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const tickers = document.querySelectorAll('.current-date-ticker');
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    const dateStr = new Date().toLocaleDateString('en-US', options);
+    tickers.forEach(t => t.textContent = dateStr);
+  });
+</script>
+<!-- Top Utility Bar End -->
 <!-- TopNavBar -->
 <nav class="bg-surface-container-lowest border-b border-outline-variant sticky top-0 z-50 flex justify-between items-center px-gutter w-full max-w-container-max mx-auto h-16">
 <div class="flex items-center gap-md">
@@ -153,7 +182,7 @@
           <span class="material-symbols-outlined text-secondary text-[20px] self-center">mail</span>
           <div>
             <p class="font-bold text-primary">Email Address</p>
-            <p class="text-on-surface-variant select-all">contact@pitchwatch.com</p>
+            <p class="text-on-surface-variant select-all">Shivam01579@gmail.com</p>
           </div>
         </div>
         
