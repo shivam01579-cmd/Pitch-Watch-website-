@@ -1,0 +1,44 @@
+name: Pitch Watch Auto Poster
+
+on:
+  schedule:
+    # Runs every 3 hours (At minute 0 of every 3rd hour)
+    - cron: '0 */3 * * *'
+  workflow_dispatch: # Allows you to manually trigger the run from the GitHub Action tab
+
+jobs:
+  run-auto-poster:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: |
+          cd blogger-automation
+          npm ci
+
+      - name: Run Discover and Post
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          BLOG_ID: ${{ secrets.BLOG_ID }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          TOKENS_JSON: ${{ secrets.TOKENS_JSON }}
+        run: |
+          cd blogger-automation
+          # Recreate tokens.json from GitHub Secrets
+          echo "$TOKENS_JSON" > tokens.json
+          
+          # Default run: discovers new RSS articles and publishes one pending post
+          node workflow.js
