@@ -7,7 +7,12 @@
   "scripts": {
     "auth": "node authenticate.js",
     "post": "node post-generator.js",
-    "update-recent": "node update-recent-posts.js"
+    "update-recent": "node update-recent-posts.js",
+    "workflow": "node workflow.js",
+    "discover": "node workflow.js --discover",
+    "process-one": "node workflow.js --process-one",
+    "monitor": "node health-monitor.js",
+    "setup-scheduler": "setup-scheduler.bat"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.4",

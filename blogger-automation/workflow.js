@@ -17,8 +17,16 @@ const {
   SPREADSHEET_ID,
   GEMINI_API_KEY,
   UNSPLASH_ACCESS_KEY,
-  PEXELS_API_KEY
+  PEXELS_API_KEY,
+  YOUTUBE_HANDLE,
+  FACEBOOK_PAGE_URL,
+  FACEBOOK_GROUPS,
+  TELEGRAM_BOT_TOKEN,
+  TELEGRAM_CHANNEL_ID,
+  FACEBOOK_PAGE_ID,
+  FACEBOOK_PAGE_ACCESS_TOKEN
 } = process.env;
+
 
 // Parse CLI flags
 const args = process.argv.slice(2);
@@ -33,7 +41,7 @@ const loopMode = hasFlag('loop');
 const discoverMode = hasFlag('discover');
 const processMode = hasFlag('process-one');
 
-const loopIntervalMs = parseInt(getFlagValue('interval'), 10) * 60 * 1000 || 10 * 60 * 1000; // default 10 minutes
+const loopIntervalMs = parseInt(getFlagValue('interval'), 10) * 60 * 1000 || 30 * 60 * 1000; // default 30 minutes
 
 // RSS Feed settings
 const FEED_URL = 'https://news.google.com/rss/search?q=cricket+news&hl=en-IN&gl=IN&ceid=IN:en';
@@ -78,36 +86,98 @@ function fetchUrl(url, extraHeaders = {}) {
   });
 }
 
+// All images below are real, high-quality, free-to-use cricket photos from Unsplash and Wikimedia.
+// ZERO AI-generated images. Fallback only used when og:image scraping from source article fails.
 const CURATED_CRICKET_IMAGES = [
+  // General stadium / match atmosphere
   {
     url: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=850&auto=format&fit=crop&q=80',
-    caption: 'Match action in progress at the stadium. Photo by Alessandro Bogliari on Unsplash.',
-    keywords: ['stadium', 'match', 'ipl', 't20', 'odi', 'international', 'lights', 'crowd', 'run', 'score']
+    caption: 'Cricket match in progress at a packed stadium. Photo via Unsplash.',
+    keywords: ['stadium', 'match', 'ipl', 't20', 'odi', 'international', 'lights', 'crowd', 'run', 'score', 'final', 'qualifier']
   },
+  // Batsman at crease
   {
     url: 'https://images.unsplash.com/photo-1593341606579-7f97d02474d4?w=850&auto=format&fit=crop&q=80',
-    caption: 'A cricket batsman focused at the crease. Photo by Naveen Kumar on Unsplash.',
-    keywords: ['batsman', 'batting', 'run', 'score', 'century', 'fifty', 'partnership', 'opener', 'captain', 'innings', 'dhoni', 'kohli', 'sharma', 'csk', 'mi', 'rcb']
+    caption: 'A cricket batsman in action at the crease. Photo via Unsplash.',
+    keywords: ['batsman', 'batting', 'run', 'score', 'century', 'fifty', 'partnership', 'opener', 'innings', 'dhoni', 'kohli', 'sharma', 'csk', 'mi', 'rcb', 'gt', 'srh', 'hundred', 'six', 'four']
   },
+  // Cricket pitch wide view
   {
     url: 'https://images.unsplash.com/photo-1512412086890-a7ecb9152b22?w=850&auto=format&fit=crop&q=80',
-    caption: 'The pristine outfield and pitch layout. Photo by Sagar Kulkarni on Unsplash.',
-    keywords: ['pitch', 'outfield', 'ground', 'stadium', 'weather', 'rain', 'toss', 'conditions']
+    caption: 'A wide view of the cricket ground and pitch. Photo via Unsplash.',
+    keywords: ['pitch', 'outfield', 'ground', 'stadium', 'weather', 'rain', 'toss', 'conditions', 'wicket', 'spin', 'grass']
   },
+  // Floodlit evening match
   {
     url: 'https://images.unsplash.com/photo-1589801258579-18e0ae1d7ad7?w=850&auto=format&fit=crop&q=80',
-    caption: 'Stadium floodlights illuminating the field. Photo on Unsplash.',
-    keywords: ['lights', 'floodlights', 'evening', 'night', 'd/n', 'stadium', 'ipl', 't20']
+    caption: 'Stadium floodlights illuminate the evening match. Photo via Unsplash.',
+    keywords: ['lights', 'floodlights', 'evening', 'night', 'd/n', 'stadium', 'ipl', 't20', 'powerplay', 'death overs']
   },
+  // Stadium crowd/fans
   {
     url: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=850&auto=format&fit=crop&q=80',
-    caption: 'Spectators cheering from the stands. Photo on Unsplash.',
-    keywords: ['crowd', 'fans', 'spectators', 'cheering', 'audience', 'atmosphere', 'stadium']
+    caption: 'Cricket fans cheering from the stands. Photo via Unsplash.',
+    keywords: ['crowd', 'fans', 'spectators', 'cheering', 'audience', 'atmosphere', 'home', 'wankhede', 'eden', 'chinnaswamy']
   },
+  // Team huddle / strategy
   {
     url: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=850&auto=format&fit=crop&q=80',
-    caption: 'A team gathering to discuss match tactics. Photo on Unsplash.',
-    keywords: ['team', 'coach', 'huddle', 'captain', 'meeting', 'squad', 'selection', 'contract', 'bcci']
+    caption: 'Players discuss team strategy ahead of the match. Photo via Unsplash.',
+    keywords: ['team', 'coach', 'huddle', 'captain', 'meeting', 'squad', 'selection', 'contract', 'bcci', 'selector', 'press conference']
+  },
+  // Ball release / bowling action
+  {
+    url: 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=850&auto=format&fit=crop&q=80',
+    caption: 'A bowler delivers the ball at full pace. Photo via Unsplash.',
+    keywords: ['bowling', 'bowler', 'paceman', 'spinner', 'wicket', 'caught', 'lbw', 'dismissal', 'fifer', 'five-wicket', 'yorker', 'bumper', 'seam', 'swing', 'spin']
+  },
+  // Cricket match aerial / overhead shot
+  {
+    url: 'https://images.unsplash.com/photo-1624880357913-a8539238245b?w=850&auto=format&fit=crop&q=80',
+    caption: 'Aerial view of a cricket ground during a live match. Photo via Unsplash.',
+    keywords: ['aerial', 'helicopter', 'overview', 'wankhede', 'chepauk', 'test', 'day', 'session', 'outfield', 'ground']
+  },
+  // Trophy / celebration
+  {
+    url: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=850&auto=format&fit=crop&q=80',
+    caption: 'Players celebrate a hard-fought cricket victory. Photo via Unsplash.',
+    keywords: ['celebration', 'trophy', 'win', 'victory', 'champion', 'title', 'winner', 'final', 'series', 'icc', 'world cup']
+  },
+  // Team in field / catching
+  {
+    url: 'https://images.unsplash.com/photo-1599474924187-334a4ae5bd3c?w=850&auto=format&fit=crop&q=80',
+    caption: 'Fielders in position during a tense cricket match. Photo via Unsplash.',
+    keywords: ['fielding', 'slip', 'catch', 'fielder', 'dive', 'run out', 'direct hit', 'boundary', 'deep square', 'point']
+  },
+  // Cricket ball close-up
+  {
+    url: 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68?w=850&auto=format&fit=crop&q=80',
+    caption: 'A red cricket ball ready for play. Photo via Unsplash.',
+    keywords: ['ball', 'red ball', 'pink ball', 'test match', 'day night test', 'new ball', 'reverse swing', 'old ball']
+  },
+  // Cricket bat and equipment
+  {
+    url: 'https://images.unsplash.com/photo-1629818651924-abf22fde5af2?w=850&auto=format&fit=crop&q=80',
+    caption: 'Cricket bat and gear laid out before a match. Photo via Unsplash.',
+    keywords: ['bat', 'gear', 'equipment', 'pad', 'gloves', 'helmet', 'preparation', 'net session', 'practice', 'training']
+  },
+  // DRS / Decision Review / tech
+  {
+    url: 'https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=850&auto=format&fit=crop&q=80',
+    caption: 'Players and umpires during a tense on-field moment. Photo via Unsplash.',
+    keywords: ['umpire', 'drs', 'review', 'decision', 'controversy', 'appeal', 'not out', 'out', 'hawkeye', 'hotspot', 'snickometer']
+  },
+  // Team India / green jersey / asia cup / test whites
+  {
+    url: 'https://images.unsplash.com/photo-1569517282132-25d22f4573e6?w=850&auto=format&fit=crop&q=80',
+    caption: 'Cricket action from an international fixture. Photo via Unsplash.',
+    keywords: ['india', 'team india', 'virat', 'rohit', 'bumrah', 'pakistan', 'england', 'australia', 'asia cup', 'icc', 'bilateral', 'test', 'whites', 'india vs']
+  },
+  // IPL / T20 batting powerplay
+  {
+    url: 'https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?w=850&auto=format&fit=crop&q=80',
+    caption: 'Explosive batting display in a T20 match. Photo via Unsplash.',
+    keywords: ['t20', 'ipl', 'powerplay', 'six', 'four', 'big hit', 'attack', 'smash', 'rcb', 'csk', 'mi', 'dc', 'rr', 'kkr', 'srh', 'lsg', 'pbks', 'gt']
   }
 ];
 
@@ -128,7 +198,7 @@ async function getStockImage(queryText, seoTitle, tags) {
           const photographer = photo.user ? ` by ${photo.user.name}` : '';
           return {
             url: photo.urls.regular,
-            caption: `Photo representing the event coverage${photographer} on Unsplash.`
+            caption: `Photo${photographer} via Unsplash.`
           };
         }
       }
@@ -153,7 +223,7 @@ async function getStockImage(queryText, seoTitle, tags) {
           const photographer = photo.photographer ? ` by ${photo.photographer}` : '';
           return {
             url: photo.src.large || photo.src.medium,
-            caption: `Photo representing the event coverage${photographer} on Pexels.`
+            caption: `Photo${photographer} via Pexels.`
           };
         }
       }
@@ -162,8 +232,8 @@ async function getStockImage(queryText, seoTitle, tags) {
     }
   }
 
-  // 3. Fallback to Curated Cricket Images
-  console.log('[Stock Image] Falling back to curated high-quality cricket stock images...');
+  // 3. Fallback to Curated Real Cricket Photos (NO AI images)
+  console.log('[Stock Image] Falling back to curated high-quality real cricket stock images...');
   const combinedText = `${seoTitle} ${tags.join(' ')}`.toLowerCase();
   
   // Find curated images that match keywords in the text
@@ -322,6 +392,720 @@ async function discoverAndQueueNews() {
   console.log(`[Queue] Discover complete. Added ${rowsToAppend.length} new topic(s) to the pending queue.`);
 }
 
+// Fetch latest videos from YouTube public handle page (robust, bypasses RSS 404s)
+async function fetchLatestYouTubeVideos(handle) {
+  if (!handle) return [];
+  const cleanHandle = handle.startsWith('@') ? handle : `@${handle}`;
+  console.log(`[YouTube] Fetching latest videos for handle: ${cleanHandle}...`);
+  try {
+    const url = `https://www.youtube.com/${cleanHandle}`;
+    const res = await fetchUrl(url);
+    if (!res.ok) {
+      console.warn(`[YouTube] Failed to fetch channel page: ${res.statusText}`);
+      return [];
+    }
+    const html = await res.text();
+    const videos = [];
+    let pos = 0;
+    while (true) {
+      pos = html.indexOf('"videoId":"', pos);
+      if (pos === -1) break;
+      const id = html.slice(pos + 11, pos + 22);
+      
+      // Find the next title block (try new content format first, fallback to runs format)
+      let titlePos = html.indexOf('"title":{"content":"', pos);
+      let titleStart = -1;
+      if (titlePos !== -1 && titlePos - pos < 8000) {
+        titleStart = titlePos + 20;
+      } else {
+        titlePos = html.indexOf('"title":{"runs":[{"text":"', pos);
+        if (titlePos !== -1 && titlePos - pos < 8000) {
+          titleStart = titlePos + 26;
+        }
+      }
+      
+      if (titleStart !== -1) {
+        const titleEnd = html.indexOf('"', titleStart);
+        const title = html.slice(titleStart, titleEnd);
+        
+        if (id.length === 11 && !videos.some(v => v.id === id)) {
+          // Decode unicode escape sequences
+          const cleanTitle = title.replace(/\\u([0-9a-fA-F]{4})/g, (match, grp) => {
+            return String.fromCharCode(parseInt(grp, 16));
+          });
+          videos.push({ id, title: cleanTitle });
+        }
+      }
+      pos += 22;
+    }
+    console.log(`[YouTube] Scraped ${videos.length} videos from channel page.`);
+    return videos;
+  } catch (err) {
+    console.warn(`[YouTube] Error scraping videos:`, err.message);
+    return [];
+  }
+}
+
+// Find matching YouTube video by matching title keywords with article metadata
+function findMatchingYouTubeVideo(videos, articleTitle, tags) {
+  if (!videos || videos.length === 0) return null;
+  const combinedTerms = [...tags, articleTitle].map(t => t.toLowerCase());
+  
+  for (const video of videos) {
+    const videoTitleLower = video.title.toLowerCase();
+    let matchCount = 0;
+    for (const term of combinedTerms) {
+      const words = term.split(/\s+/).filter(w => w.length > 3);
+      for (const word of words) {
+        if (videoTitleLower.includes(word)) {
+          matchCount++;
+        }
+      }
+    }
+    // If we have at least 2 word matches, we consider it a match
+    if (matchCount >= 2) {
+      console.log(`[YouTube] Matched video: "${video.title}" (ID: ${video.id})`);
+      return video;
+    }
+  }
+  return null;
+}
+
+// Generate a local HTML dashboard helper for Facebook sharing
+function generateShareAssistant(livePostUrl, seoData, matchedVideo) {
+  const pageUrl = FACEBOOK_PAGE_URL || 'https://www.facebook.com';
+  const groupsStr = FACEBOOK_GROUPS || '';
+  const groups = groupsStr ? groupsStr.split(',').map(g => g.trim()).filter(Boolean) : [];
+
+  const videoUrl = matchedVideo ? `https://www.youtube.com/watch?v=${matchedVideo.id}` : '';
+  const videoTitle = matchedVideo ? matchedVideo.title : '';
+
+  const groupsHtml = groups.length > 0 ? groups.map((group, idx) => {
+    let cleanName = group.replace('https://www.facebook.com/groups/', '').replace(/\//g, '');
+    if (cleanName.length > 25) cleanName = cleanName.slice(0, 25) + '...';
+    return `
+          <div class="group-item">
+            <div class="group-name">Group #${idx+1}: <strong>${cleanName}</strong></div>
+            <a href="${group}" target="_blank" class="btn btn-outline group-btn">Open Group</a>
+          </div>`;
+  }).join('') : `
+          <p style="color: var(--text-muted); font-size: 0.9rem; font-style: italic;">No Facebook groups configured in your .env. Add them as comma-separated URLs in FACEBOOK_GROUPS.</p>`;
+
+  const videoHtml = matchedVideo ? `
+      <!-- YouTube Embed Copy Box -->
+      <div class="copy-box" style="border-color: rgba(168, 85, 247, 0.3);">
+        <div class="copy-box-label" style="color: #a855f7;">Matched YouTube Video (Optional Promo)</div>
+        <div style="font-size:0.85rem; margin-bottom:8px; color: var(--text-muted);"><strong>Video Title:</strong> ${videoTitle}</div>
+        <div class="copy-content-box" style="white-space: nowrap; overflow-x: auto; max-height: 60px;" id="youtube-link">${videoUrl}</div>
+        <button class="btn btn-outline" style="border-color: #a855f7; color: #d8b4fe;" onclick="copyText('youtube-link', 'YouTube link copied!')">Copy YouTube Link</button>
+      </div>` : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pitch Watch Share Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1329;
+      --card-bg: rgba(26, 38, 57, 0.65);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --accent: #f43f5e;
+      --success: #10b981;
+      --font: 'Outfit', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: radial-gradient(circle at 10% 20%, rgba(4, 21, 45, 1) 0%, rgba(11, 19, 41, 1) 90%);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 800px;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 25px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+    }
+
+    header h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #38bdf8 0%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 5px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .meta-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--primary);
+      border-radius: 30px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 15px;
+    }
+
+    .section {
+      margin-bottom: 25px;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .post-info-card {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .post-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .post-link-display {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      word-break: break-all;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .copy-box {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 15px;
+      position: relative;
+    }
+
+    .copy-box-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .copy-content-box {
+      font-size: 0.95rem;
+      color: var(--text);
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      background: rgba(0, 0, 0, 0.15);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      margin-bottom: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+      text-decoration: none;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #0b1329;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--primary);
+    }
+
+    .btn-facebook {
+      background: #1877f2;
+      color: white;
+    }
+
+    .btn-facebook:hover {
+      background: #166fe5;
+      box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3);
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    @media (min-width: 600px) {
+      .btn-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .groups-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .group-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.15);
+      border: 1px solid var(--border);
+      padding: 12px 18px;
+      border-radius: 10px;
+    }
+
+    .group-name {
+      font-size: 0.9rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 70%;
+    }
+
+    .group-btn {
+      width: auto;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--success);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Tips box styling */
+    .tips-callout {
+      background: rgba(244, 63, 94, 0.05);
+      border-left: 4px solid var(--accent);
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 15px;
+      font-size: 0.85rem;
+    }
+
+    .tips-callout strong {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="meta-badge">Facebook Reach Hack</div>
+      <h1>Pitch Watch Share Assistant</h1>
+      <p>Easily post engaging updates and drive traffic from your Facebook page & groups.</p>
+    </header>
+
+    <div class="section">
+      <div class="section-title">📌 Published Post Details</div>
+      <div class="post-info-card">
+        <div class="post-title">${seoData.discoverTitle || seoData.seoTitle}</div>
+        <div class="post-link-display" id="post-link">${livePostUrl}</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">📋 Copy Engagement Content</div>
+      
+      <!-- Facebook Caption Copy Box -->
+      <div class="copy-box">
+        <div class="copy-box-label">Engaging Caption (Optimized for Facebook)</div>
+        <div class="copy-content-box" id="fb-caption">${seoData.socialCaptions.facebook}</div>
+        <button class="btn btn-primary" onclick="copyText('fb-caption', 'Caption copied to clipboard!')">Copy Caption</button>
+      </div>
+
+      <!-- Blogger Link Copy Box -->
+      <div class="copy-box">
+        <div class="copy-box-label">Blogger Post Link (To paste in the Comments!)</div>
+        <div class="copy-content-box" style="white-space: nowrap; overflow-x: auto; max-height: 60px;" id="blogger-link">${livePostUrl}</div>
+        <button class="btn btn-outline" onclick="copyText('blogger-link', 'Blogger link copied!')">Copy Blogger Link</button>
+      </div>
+
+      ${videoHtml}
+
+      <div class="tips-callout">
+        📢 <strong>PRO GROWTH HACK:</strong> Do <strong>NOT</strong> put the blog link inside your Facebook post text! Facebook's reach algorithm penalizes outbound links. Instead:
+        <br>1. Copy the <strong>Caption</strong> and post it on your Page or in Groups.
+        <br>2. Immediately comment on your own post with the <strong>Blogger Post Link</strong>.
+        <br>This keeps your post reach high and gets maximum clicks!
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">🌐 Step 1: Post to Your Page</div>
+      <a href="${pageUrl}" target="_blank" class="btn btn-facebook">
+        Open My Facebook Page
+      </a>
+    </div>
+
+    <div class="section">
+      <div class="section-title">👥 Step 2: Share in Cricket Groups</div>
+      <div class="groups-list">
+        ${groupsHtml}
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied to clipboard!</div>
+
+  <script>
+    function copyText(elementId, successMsg) {
+      const text = document.getElementById(elementId).innerText || document.getElementById(elementId).textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(successMsg);
+      }).catch(err => {
+        console.error('Could not copy text: ', err);
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          showToast(successMsg);
+        } catch (e) {
+          alert('Failed to copy. Please manually select and copy.');
+        }
+        document.body.removeChild(textarea);
+      });
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.innerText = message;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+  </script>
+</body>
+</html>`;
+
+  const outputPath = path.resolve('share-assistant.html');
+  fs.writeFileSync(outputPath, html, 'utf8');
+  console.log(`[Share Assistant] Dashboard written successfully to: ${outputPath}`);
+}
+
+// Post to Telegram Channel using Telegram Bot API
+// matchedVideo: { id, title } object or null
+async function sendToTelegram(livePostUrl, seoData, imageUrl, matchedVideo) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHANNEL_ID) {
+    console.log('[Telegram] Automated posting skipped (TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID missing in .env).');
+    return;
+  }
+
+  console.log(`[Telegram] Sending automated update to channel: ${TELEGRAM_CHANNEL_ID}...`);
+
+  const escapeHtml = (text) => {
+    if (!text) return '';
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  };
+
+  const title = escapeHtml(seoData.discoverTitle || seoData.seoTitle);
+
+  // Build engaging Hinglish caption
+  // Use AI-generated telegram caption if available, otherwise build a good default
+  const rawCaption = seoData.socialCaptions
+    ? (seoData.socialCaptions.telegram || seoData.socialCaptions.facebook || '')
+    : '';
+  const escapedCaption = escapeHtml(rawCaption);
+
+  // YouTube section if video is available
+  const youtubeChannelUrl = YOUTUBE_HANDLE
+    ? `https://www.youtube.com/${YOUTUBE_HANDLE.startsWith('@') ? YOUTUBE_HANDLE : '@' + YOUTUBE_HANDLE}`
+    : null;
+  const youtubeVideoUrl = matchedVideo ? `https://www.youtube.com/watch?v=${matchedVideo.id}` : null;
+  const youtubeLink = youtubeVideoUrl || youtubeChannelUrl;
+  const youtubeLine = youtubeLink
+    ? `\n\n🎥 <b>Video Analysis:</b> <a href="${youtubeLink}">${matchedVideo ? escapeHtml(matchedVideo.title) : 'Watch on YouTube'}</a>`
+    : '';
+
+  // Construct full message
+  let messageText = `🔥 <b>${title}</b>\n\n${escapedCaption}${youtubeLine}\n\n👉 <a href="${livePostUrl}">Puri analysis aur Dream11 tips padhein!</a>`;
+
+  // Safe slice to keep caption under 1024 characters for photos (Telegram limit)
+  const LIMIT = imageUrl ? 1020 : 4090;
+  if (messageText.length > LIMIT) {
+    const overflowLength = messageText.length - LIMIT;
+    const truncatedCaption = escapedCaption.slice(0, Math.max(0, escapedCaption.length - overflowLength - 5)) + '...';
+    messageText = `🔥 <b>${title}</b>\n\n${truncatedCaption}${youtubeLine}\n\n👉 <a href="${livePostUrl}">Puri analysis aur Dream11 tips padhein!</a>`;
+  }
+
+  const sendTelegramPayload = (endpoint, payload) => {
+    return new Promise((resolve) => {
+      const postData = JSON.stringify(payload);
+      const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`;
+      const urlObj = new URL(url);
+      const reqOptions = {
+        hostname: urlObj.hostname,
+        path: urlObj.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+      const req = https.request(reqOptions, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => {
+          const parsed = (() => { try { return JSON.parse(body); } catch { return {}; } })();
+          if (res.statusCode >= 200 && res.statusCode < 300 && parsed.ok) {
+            console.log(`[Telegram] ${endpoint} sent successfully.`);
+            resolve({ success: true });
+          } else {
+            console.warn(`[Telegram] ${endpoint} failed. Code: ${res.statusCode}. Body: ${body}`);
+            resolve({ success: false, body });
+          }
+        });
+      });
+      req.on('error', (err) => {
+        console.warn(`[Telegram] Connection error (${endpoint}): ${err.message}`);
+        resolve({ success: false });
+      });
+      req.write(postData);
+      req.end();
+    });
+  };
+
+  // Try with image first; if it fails (e.g. Telegram can't fetch the URL), fallback to text
+  if (imageUrl) {
+    const photoResult = await sendTelegramPayload('sendPhoto', {
+      chat_id: TELEGRAM_CHANNEL_ID,
+      photo: imageUrl,
+      caption: messageText,
+      parse_mode: 'HTML'
+    });
+    if (!photoResult.success) {
+      console.warn('[Telegram] sendPhoto failed, falling back to sendMessage with link preview...');
+      await sendTelegramPayload('sendMessage', {
+        chat_id: TELEGRAM_CHANNEL_ID,
+        text: messageText,
+        parse_mode: 'HTML',
+        disable_web_page_preview: false
+      });
+    }
+  } else {
+    await sendTelegramPayload('sendMessage', {
+      chat_id: TELEGRAM_CHANNEL_ID,
+      text: messageText,
+      parse_mode: 'HTML',
+      disable_web_page_preview: false
+    });
+  }
+}
+
+// Post automatically to your Facebook Page using the Meta Graph API
+async function sendToFacebookPage(livePostUrl, seoData, imageUrl) {
+  if (!FACEBOOK_PAGE_ID || !FACEBOOK_PAGE_ACCESS_TOKEN) {
+    console.log('[Facebook Page] Automated posting skipped (FACEBOOK_PAGE_ID or FACEBOOK_PAGE_ACCESS_TOKEN missing in .env).');
+    return;
+  }
+
+  console.log(`[Facebook Page] Sending automated post to page ID: ${FACEBOOK_PAGE_ID}...`);
+
+  const captionText = seoData.socialCaptions ? seoData.socialCaptions.facebook : '';
+  const endpoint = imageUrl ? 'photos' : 'feed';
+  const url = `https://graph.facebook.com/v19.0/${FACEBOOK_PAGE_ID}/${endpoint}`;
+
+  const payload = imageUrl ? {
+    url: imageUrl,
+    caption: captionText,
+    access_token: FACEBOOK_PAGE_ACCESS_TOKEN
+  } : {
+    message: captionText,
+    access_token: FACEBOOK_PAGE_ACCESS_TOKEN
+  };
+
+  return new Promise((resolve) => {
+    const postData = JSON.stringify(payload);
+    const urlObj = new URL(url);
+    const reqOptions = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = https.request(reqOptions, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', async () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            const resJson = JSON.parse(body);
+            const createdId = resJson.post_id || resJson.id;
+            console.log(`[Facebook Page] Post successfully created (ID: ${createdId}).`);
+
+            // Post Blogger link in the first comment
+            if (createdId) {
+              console.log(`[Facebook Page] Posting Blogger link in comments of post: ${createdId}...`);
+              await postFacebookComment(createdId, `👉 Pura detail aur Dream11 Team analysis yahan padhein: ${livePostUrl}`);
+            }
+          } catch (jsonErr) {
+            console.warn(`[Facebook Page] Warning: Error parsing response body: ${jsonErr.message}`);
+          }
+        } else {
+          console.warn(`[Facebook Page] Failed to post. Code: ${res.statusCode}. Response: ${body}`);
+        }
+        resolve();
+      });
+    });
+
+    req.on('error', (err) => {
+      console.warn(`[Facebook Page] Connection error: ${err.message}`);
+      resolve();
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+// Helper to post a comment on a Facebook post
+function postFacebookComment(postId, message) {
+  const url = `https://graph.facebook.com/v19.0/${postId}/comments`;
+  const payload = {
+    message: message,
+    access_token: FACEBOOK_PAGE_ACCESS_TOKEN
+  };
+
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify(payload);
+    const urlObj = new URL(url);
+    const reqOptions = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = https.request(reqOptions, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          console.log('[Facebook Page] Blogger link successfully posted in the first comment.');
+          resolve();
+        } else {
+          reject(new Error(`Code: ${res.statusCode}. Response: ${body}`));
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      reject(err);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
 // Process one pending topic from the queue
 async function processNextPendingTopic() {
   if (!BLOG_ID) {
@@ -407,7 +1191,7 @@ async function processNextPendingTopic() {
     console.log('[Gemini] Generating SEO structured news analysis in JSON mode...');
     const ai = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = ai.getGenerativeModel({ 
-      model: 'gemini-2.5-flash',
+      model: 'gemini-flash-latest',
       generationConfig: { responseMimeType: 'application/json' }
     });
     
@@ -423,16 +1207,18 @@ async function processNextPendingTopic() {
       
       Your output must be a JSON object with the following fields:
       1. "seoTitle": String (A unique SEO title, STRICTLY between 50 and 60 characters max. Must naturally place the primary focus keyword).
-      2. "metaDescription": String (SEO meta description, STRICTLY between 140 and 155 characters max. Do not exceed 155 characters. Must naturally contain the focus keyword).
-      3. "urlSlug": String (Clean, keyword-rich URL slug without slashes or spaces, e.g. "ipl-2026-csk-vs-mi-prediction").
-      4. "primaryKeyword": String (The chosen focus keyword).
-      5. "tags": Array of Strings (3-5 relevant tags. CRITICAL: If the post is related to IPL, include "IPL". If it is related to T20 matches or tournaments, include "T20". If it is related to ODI matches, include "ODI". If it is related to Test matches, include "Test Match". If related to Team India, include "Team India").
-      6. "articleBodyHtml": String (The complete article body in HTML format. Must be 800-1200 words. Do not include H1 tags. Use <h2> and <h3> for headings. Use <p>, <ul>, <li>, and <blockquote> for quotes. You MUST naturally interlink 2 to 4 of the provided older articles from the list above inside the body paragraphs using appropriate HTML anchor tags. Include a "Related Articles" section at the end of the post using these links).
-      7. "featuredSummary": String (A 50-70 word concise summary ideal for featured snippets/answers, placing the focus keyword).
-      8. "socialCaptions": Object with keys "facebook", "twitter", "telegram", "whatsapp" (Engaging, platform-tailored social media captions).
-      9. "faq": Array of Objects, each with "question" (String) and "answer" (String) (2-3 frequently asked questions with direct, clear answers).
-      10. "suggestedFutureTopics": Array of Strings (5-10 related future article ideas to build topical authority).
-      11. "oldPostToUpdate": Object with keys:
+      2. "discoverTitle": String (An extremely engaging, curiosity-driven, emotional headline between 65 and 85 characters max. Focus on high stakes, tactical clashes, key players, or dramatic match twists to target Google Discover).
+      3. "metaDescription": String (SEO meta description, STRICTLY between 140 and 155 characters max. Do not exceed 155 characters. Must naturally contain the focus keyword).
+      4. "urlSlug": String (Clean, keyword-rich URL slug without slashes or spaces, e.g. "ipl-2026-csk-vs-mi-prediction").
+      5. "primaryKeyword": String (The chosen focus keyword).
+      6. "tags": Array of Strings (3-5 relevant tags. CRITICAL: If the post is related to IPL, include "IPL". If it is related to T20 matches or tournaments, include "T20". If it is related to ODI matches, include "ODI". If it is related to Test matches, include "Test Match". If related to Team India, include "Team India").
+      7. "articleBodyHtml": String (The complete article body in HTML format. Must be 800-1200 words. Do not include H1 tags. Use <h2> and <h3> for headings. Use <p>, <ul>, <li>, and <blockquote> for quotes. You MUST naturally interlink 2 to 4 of the provided older articles from the list above inside the body paragraphs using appropriate HTML anchor tags. Include a "Related Articles" section at the end of the post using these links).
+      8. "featuredSummary": String (A 50-70 word concise summary ideal for featured snippets/answers, placing the focus keyword).
+      9. "socialCaptions": Object with keys "facebook", "twitter", "telegram", "whatsapp" (Engaging, platform-tailored social media captions. CRITICAL Guidelines: The "facebook" and "telegram" captions must be written in engaging, conversational Hinglish (Hindi written in Latin script, e.g. "Doston, kya lagta hai aapko..." or "Kya Gill ki wapsi hogi?"). The facebook caption must start with a hot question or controversy to spark discussion/comments, use cricket emojis, and end with a clear Call to Action: "Pura detail aur Dream11 Team analysis comments me hai! 👇". Do NOT include any link or placeholder URL in the facebook caption itself (as we want to bypass Facebook's reach penalty by pasting it in the comments). The "telegram" caption should also be in Hinglish, summarize the news excitingly, and end with a link-click prompt).
+      10. "faq": Array of Objects, each with "question" (String) and "answer" (String) (2-3 frequently asked questions with direct, clear answers).
+      11. "suggestedFutureTopics": Array of Strings (5-10 related future article ideas to build topical authority).
+      12. "fantasyTips": Object or null (If the topic is an upcoming match preview, generate fantasy tips, otherwise return null. Object fields: "pitchReport": String (brief 20-30 words summary), "keyPlayers": Array of 3-4 player names, "captainOptions": Array of 2 player names, "viceCaptainOptions": Array of 2 player names).
+      13. "oldPostToUpdate": Object with keys:
           - "index": Number or null (The index of the old post from the list above that is most relevant to link to this new post. If none are relevant, return null).
           - "recommendationText": String or null (A short, natural paragraph with an HTML link recommending this new post. Use placeholder "__NEW_POST_URL__" for the URL and "__NEW_POST_TITLE__" for the title. Example: "<p><strong>Also Read:</strong> For more details, check out our report on <a href=\\"__NEW_POST_URL__\\">__NEW_POST_TITLE__</a>.</p>").
           
@@ -443,7 +1229,22 @@ async function processNextPendingTopic() {
       - Verify the keyword is naturally placed in the title, first paragraph, at least one H2 heading, meta description, and slug.
     `;
     
-    const result = await model.generateContent(prompt);
+    let result = null;
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        result = await model.generateContent(prompt);
+        break;
+      } catch (err) {
+        if ((err.status === 503 || err.message.includes('503')) && retries > 1) {
+          console.warn(`[Gemini] 503 Service Unavailable. Retrying in 5 seconds... (${retries - 1} retries left)`);
+          await new Promise(r => setTimeout(r, 5000));
+          retries--;
+        } else {
+          throw err;
+        }
+      }
+    }
     let responseJsonText = result.response.text().trim();
     
     // Clean any accidental markdown codeblock fences from AI output
@@ -454,10 +1255,22 @@ async function processNextPendingTopic() {
     const seoData = JSON.parse(responseJsonText);
     console.log('[Gemini] Parsed SEO and Article content successfully.');
     console.log(`[SEO] Focus Keyword: "${seoData.primaryKeyword}"`);
-    console.log(`[SEO] Title: "${seoData.seoTitle}" (${seoData.seoTitle.length} chars)`);
-    console.log(`[SEO] Description: "${seoData.metaDescription}" (${seoData.metaDescription.length} chars)`);
-    console.log(`[SEO] Slug: "${seoData.urlSlug}"`);
+    console.log(`[SEO] SEO Title:     "${seoData.seoTitle}" (${seoData.seoTitle.length} chars)`);
+    console.log(`[SEO] Discover Title: "${seoData.discoverTitle}" (${seoData.discoverTitle?.length || 0} chars)`);
+    console.log(`[SEO] Description:   "${seoData.metaDescription}" (${seoData.metaDescription.length} chars)`);
+    console.log(`[SEO] Slug:          "${seoData.urlSlug}"`);
     console.log(`[SEO] Tags: ${seoData.tags.join(', ')}`);
+    
+    // Check for matching recent YouTube video to embed
+    let matchedVideo = null;
+    if (YOUTUBE_HANDLE) {
+      try {
+        const youtubeVideos = await fetchLatestYouTubeVideos(YOUTUBE_HANDLE);
+        matchedVideo = findMatchingYouTubeVideo(youtubeVideos, seoData.seoTitle, seoData.tags);
+      } catch (ytErr) {
+        console.warn('[YouTube] Matches check skipped due to error:', ytErr.message);
+      }
+    }
     
     // 3. Image Selection: Try to scrape og:image from original article, fallback to high-quality stock photo
     let imageUrl = null;
@@ -494,7 +1307,8 @@ async function processNextPendingTopic() {
           const isGeneric = url.includes('logo') || url.includes('default') || url.includes('fallback') || url.includes('placeholder') || url.includes('IE-OGimage') || url.includes('facebook-share');
           if (url.startsWith('http') && !isGeneric) {
             imageUrl = url;
-            imageCaption = `Photo representing the event coverage. Source: ${realArticleLink.replace(/https?:\/\/(www\.)?/, '').split('/')[0]}`;
+            const sourceDomain = realArticleLink.replace(/https?:\/\/(www\.)?/, '').split('/')[0];
+            imageCaption = `Photo: ${sourceDomain}`;
             console.log(`[Scraper] Successfully found high-quality real article image: ${imageUrl}`);
           }
         }
@@ -513,11 +1327,22 @@ async function processNextPendingTopic() {
         console.log(`[Stock Image] Selected Image: ${imageUrl}`);
       } catch (err) {
         console.warn(`[Stock Image] Failed to select stock image: ${err.message}`);
-        // Ultimate fallback to stadium under lights
-        imageUrl = 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=850&auto=format&fit=crop&q=80';
-        imageCaption = 'General cricket stadium photo by Alessandro Bogliari on Unsplash.';
       }
     }
+
+    // GUARANTEED FINAL FALLBACK: agar koi bhi image na mile toh yeh hardcoded reliable URL use karo
+    if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('http')) {
+      console.warn('[Image] All image sources failed. Using guaranteed hardcoded fallback image.');
+      // Randomly pick one of 3 reliable fallback images to avoid repetition
+      const FALLBACKS = [
+        'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=850&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1593341606579-7f97d02474d4?w=850&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=850&auto=format&fit=crop&q=80'
+      ];
+      imageUrl = FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
+      imageCaption = 'Cricket action photo via Unsplash.';
+    }
+    console.log(`[Image] Final image URL confirmed: ${imageUrl}`);
     
     // 4. Build post HTML with image, body, EEAT, and Schema JSON-LD
     const embeddedImageHtml = `
@@ -526,6 +1351,52 @@ async function processNextPendingTopic() {
         <p style="font-size: 0.85em; color: #666; margin-top: 8px; font-style: italic;">${imageCaption}</p>
       </div>
     `;
+
+    let embeddedVideoHtml = '';
+    if (matchedVideo) {
+      embeddedVideoHtml = `
+        <div class="youtube-embed-box" style="margin-bottom: 30px; text-align: center; background: #fafafa; padding: 15px; border-radius: 6px; border: 1px solid #eee;">
+          <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1.1em; color: #111; font-family: sans-serif;">🎥 Watch Our Video Analysis</h3>
+          <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; border-radius: 4px;">
+            <iframe src="https://www.youtube.com/embed/${matchedVideo.id}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;" allowfullscreen></iframe>
+          </div>
+        </div>
+      `;
+    }
+
+    // Format fantasy tips if generated
+    if (seoData.fantasyTips) {
+      const tips = seoData.fantasyTips;
+      const keyPlayersLi = tips.keyPlayers ? tips.keyPlayers.map(p => `<li>${p}</li>`).join('') : '';
+      const captainStr = tips.captainOptions ? tips.captainOptions.join(', ') : 'N/A';
+      const viceCaptainStr = tips.viceCaptainOptions ? tips.viceCaptainOptions.join(', ') : 'N/A';
+      
+      const fantasyHtml = `
+        <div class="fantasy-tips-box" style="margin: 30px 0; padding: 20px; border: 2px dashed #0284c7; background: #f0f9ff; border-radius: 6px; font-family: sans-serif;">
+          <h3 style="margin-top: 0; color: #0284c7; font-size: 1.25em; border-bottom: 1px solid #bae6fd; padding-bottom: 8px; display: flex; align-items: center;">🏏 Dream11 / Fantasy Cricket Guide</h3>
+          <p style="margin: 10px 0; font-size: 0.95em;"><strong>Pitch Conditions:</strong> ${tips.pitchReport || 'Dry and balanced wicket.'}</p>
+          <div style="margin-top: 15px;">
+            <strong>Key Players to Pick:</strong>
+            <ul style="margin: 8px 0 12px 20px; padding: 0; font-size: 0.95em;">
+              ${keyPlayersLi}
+            </ul>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+            <div style="background: #ffffff; padding: 10px; border: 1px solid #e0f2fe; border-radius: 4px; font-size: 0.9em;">
+              <strong style="color: #0369a1;">Captain Choices:</strong>
+              <p style="margin: 5px 0 0 0; font-weight: bold; color: #334155;">${captainStr}</p>
+            </div>
+            <div style="background: #ffffff; padding: 10px; border: 1px solid #e0f2fe; border-radius: 4px; font-size: 0.9em;">
+              <strong style="color: #0369a1;">Vice-Captain Choices:</strong>
+              <p style="margin: 5px 0 0 0; font-weight: bold; color: #334155;">${viceCaptainStr}</p>
+            </div>
+          </div>
+          <p style="margin: 15px 0 0 0; font-size: 0.85em; color: #64748b; font-style: italic; text-align: center;">Disclaimer: Fantasy cricket involves financial risk. Form your teams based on your own research.</p>
+        </div>
+      `;
+      
+      seoData.articleBodyHtml += fantasyHtml;
+    }
     
     const eeatHtml = `
       <div class="eeat-box" style="margin-top: 30px; padding: 20px; border-top: 1px solid #eee; font-size: 0.9em; color: #555; background: #fafafa; border-radius: 4px;">
@@ -616,7 +1487,7 @@ async function processNextPendingTopic() {
       seoData.articleBodyHtml += faqVisibleHtml;
     }
     
-    const finalHtmlContent = schemaHtml + embeddedImageHtml + seoData.articleBodyHtml + eeatHtml;
+    const finalHtmlContent = schemaHtml + embeddedImageHtml + embeddedVideoHtml + seoData.articleBodyHtml + eeatHtml;
     
     // 5. Publish to Blogger
     if (isDryRun) {
@@ -629,6 +1500,27 @@ async function processNextPendingTopic() {
       console.log(finalHtmlContent.slice(0, 1000) + '...\n');
       console.log('================================================\n');
       
+      // Generate dry-run Share Assistant
+      try {
+        generateShareAssistant('https://crickettrendsnews.blogspot.com/2026/05/dry-run-cricket-article.html', seoData, matchedVideo);
+      } catch (shareErr) {
+        console.warn(`[Share Assistant] Warning: Failed to generate dry-run dashboard: ${shareErr.message}`);
+      }
+
+      // Dry-run Telegram check log
+      if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHANNEL_ID) {
+        console.log(`[Telegram] [DRY RUN] Would send automated post to channel: ${TELEGRAM_CHANNEL_ID}`);
+      } else {
+        console.log('[Telegram] [DRY RUN] Automated posting skipped (credentials missing in .env).');
+      }
+
+      // Dry-run Facebook Page check log
+      if (FACEBOOK_PAGE_ID && FACEBOOK_PAGE_ACCESS_TOKEN) {
+        console.log(`[Facebook Page] [DRY RUN] Would send automated post to page ID: ${FACEBOOK_PAGE_ID}`);
+      } else {
+        console.log('[Facebook Page] [DRY RUN] Automated posting skipped (credentials missing in .env).');
+      }
+
       await sheetsClient.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: `Sheet1!D${pendingIndex}`,
@@ -644,11 +1536,13 @@ async function processNextPendingTopic() {
     // Sanitize custom URL slug (alphanumeric + hyphen only)
     const sanitizedSlug = seoData.urlSlug.replace(/[^a-zA-Z0-9-]/g, '').toLowerCase();
 
-    console.log(`[Blogger] Publishing live post: "${seoData.seoTitle}"...`);
+    const finalBloggerTitle = seoData.discoverTitle || seoData.seoTitle;
+
+    console.log(`[Blogger] Publishing live post: "${finalBloggerTitle}"...`);
     const bloggerResponse = await bloggerClient.posts.insert({
       blogId: BLOG_ID,
       requestBody: {
-        title: seoData.seoTitle,
+        title: finalBloggerTitle,
         content: finalHtmlContent,
         labels: seoData.tags,
         customUrl: sanitizedSlug, // Use the keyword-rich custom slug
@@ -665,7 +1559,7 @@ async function processNextPendingTopic() {
     breadcrumbSchema.itemListElement.push({
       "@type": "ListItem",
       "position": 3,
-      "name": seoData.seoTitle,
+      "name": finalBloggerTitle,
       "item": livePostUrl
     });
     
@@ -734,6 +1628,27 @@ async function processNextPendingTopic() {
     seoData.suggestedFutureTopics.forEach((t, i) => console.log(`${i+1}. ${t}`));
     console.log('----------------------------------------\n');
 
+    // Generate live Share Assistant
+    try {
+      generateShareAssistant(livePostUrl, seoData, matchedVideo);
+    } catch (shareErr) {
+      console.warn(`[Share Assistant] Warning: Failed to generate dashboard: ${shareErr.message}`);
+    }
+
+    // Post automatically to Telegram Channel (article + YouTube link dono)
+    try {
+      await sendToTelegram(livePostUrl, seoData, imageUrl, matchedVideo);
+    } catch (telegramErr) {
+      console.warn(`[Telegram] Warning: Failed to send auto-post: ${telegramErr.message}`);
+    }
+
+    // Post automatically to Facebook Page
+    try {
+      await sendToFacebookPage(livePostUrl, seoData, imageUrl);
+    } catch (facebookErr) {
+      console.warn(`[Facebook Page] Warning: Failed to send auto-post: ${facebookErr.message}`);
+    }
+
     // 9. Update row to COMPLETED and save Post URL
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
@@ -784,43 +1699,55 @@ async function runWorkflowStep() {
   console.log(`[Workflow] Step complete. Waiting for next interval...\n`);
 }
 
-// Master Loop Orchestrator
-async function startAutomationLoop() {
-  console.log(`[Workflow] Starting continuous automation loop.`);
-  console.log(`[Workflow] Discovering and posting checks will trigger every ${loopIntervalMs / 60000} minute(s).`);
-  
-  // Run first step immediately
-  await runWorkflowStep();
-  
-  // Setup interval loop
-  setInterval(async () => {
-    await runWorkflowStep();
-  }, loopIntervalMs);
-}
-
 // Main Execution router
+// NOTE: Loop mode ab Windows Task Scheduler handle karta hai.
+// Script ek baar chalta hai, kaam karta hai, aur band ho jaata hai.
+// Task Scheduler har 30 min pe automatically restart karta hai.
 async function main() {
+  const startTime = Date.now();
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`[Workflow] Run started at: ${new Date().toLocaleString('en-IN')}`);
+  console.log(`${'='.repeat(60)}`);
+
   try {
-    // 1. Initialize Clients
+    // 1. Initialize Google API Clients
     initGoogleClients();
-    
+
     if (discoverMode) {
-      // Run only discover mode
+      // Only discover new topics and add to queue
       await discoverAndQueueNews();
     } else if (processMode) {
-      // Process one pending topic
+      // Process exactly one pending topic from queue
       await processNextPendingTopic();
-    } else if (loopMode) {
-      // Start loop mode
-      await startAutomationLoop();
     } else {
-      // Default: run one complete step of discover + process
+      // DEFAULT: Full step — discover + process one article
+      // Windows Task Scheduler calls this every 30 minutes automatically
       await runWorkflowStep();
     }
   } catch (err) {
-    console.error('Fatal execution error:', err.message);
+    console.error('[FATAL] Execution error:', err.message);
+    // Try to send Telegram alert for fatal errors
+    if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHANNEL_ID) {
+      const alertPayload = JSON.stringify({
+        chat_id: TELEGRAM_CHANNEL_ID,
+        text: `⚠️ <b>Pitch Watch Automation Error</b>\n\n<code>${err.message.slice(0, 500)}</code>\n\nTime: ${new Date().toLocaleString('en-IN')}`,
+        parse_mode: 'HTML'
+      });
+      try {
+        const alertUrl = new URL(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`);
+        const alertReq = https.request({ hostname: alertUrl.hostname, path: alertUrl.pathname, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(alertPayload) } });
+        alertReq.write(alertPayload);
+        alertReq.end();
+        console.log('[Alert] Fatal error notification sent to Telegram.');
+      } catch (_) { /* ignore alert failures */ }
+    }
     process.exit(1);
   }
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`\n[Workflow] Run completed in ${elapsed}s. Process exiting.`);
+  console.log(`${'='.repeat(60)}\n`);
+  process.exit(0);
 }
 
 main();

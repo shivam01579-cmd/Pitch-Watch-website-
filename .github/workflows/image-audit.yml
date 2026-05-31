@@ -1,0 +1,48 @@
+name: "🖼️ Pitch Watch — Image Audit & Auto-Fix (Daily)"
+
+on:
+  schedule:
+    # Daily at 3:00 AM UTC (8:30 AM IST) — scan and fix all post images
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Manual trigger — run anytime from GitHub Actions tab
+
+jobs:
+  image-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # Image audit takes longer — up to 30 min
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: blogger-automation/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd blogger-automation
+          npm ci
+
+      - name: Restore Google OAuth tokens
+        run: |
+          cd blogger-automation
+          echo '${{ secrets.TOKENS_JSON }}' > tokens.json
+
+      - name: Run Image Audit & Auto-Fix
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          BLOG_ID: ${{ secrets.BLOG_ID }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        run: |
+          cd blogger-automation
+          node audit-fix-images.js
+          echo "[Done] Image audit complete."

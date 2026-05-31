@@ -1,0 +1,46 @@
+name: "🔍 Pitch Watch — Health Monitor (Every 2 Hours)"
+
+on:
+  schedule:
+    # Every 2 hours — checks all services and alerts on Telegram if anything breaks
+    - cron: '0 */2 * * *'
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: blogger-automation/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd blogger-automation
+          npm ci
+
+      - name: Restore Google OAuth tokens
+        run: |
+          cd blogger-automation
+          echo '${{ secrets.TOKENS_JSON }}' > tokens.json
+
+      - name: Run Health Monitor
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          BLOG_ID: ${{ secrets.BLOG_ID }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        run: |
+          cd blogger-automation
+          node health-monitor.js
