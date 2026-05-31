@@ -200,8 +200,8 @@ async function checkQueueStatus() {
     if (failed.length > 0) {
       issues.push(`❌ <b>${failed.length} article(s) FAILED</b> in queue!\nFailed topics:\n${failed.slice(0, 3).map(r => `• ${r[0]}`).join('\n')}`);
     }
-    if (pending.length > 30) {
-      issues.push(`⚠️ Queue mein <b>${pending.length} pending articles</b> jam gaye hain — kuch process nahi ho raha?`);
+    if (pending.length > 350) {
+      issues.push(`⚠️ Queue mein <b>${pending.length} pending articles</b> jam gaye hain — check if queue has too many unprocessed entries.`);
     }
     if (completed.length > 0) {
       // Check last completion time
