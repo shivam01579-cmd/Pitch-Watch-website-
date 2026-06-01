@@ -86,6 +86,20 @@ function fetchUrl(url, extraHeaders = {}) {
   });
 }
 
+async function decodeUrl(url) {
+  try {
+    const decoder = new GoogleNewsDecoder();
+    const decodedResult = await decoder.decodeGoogleNewsUrl(url);
+    if (decodedResult && decodedResult.status && decodedResult.decodedUrl) {
+      return decodedResult.decodedUrl;
+    }
+  } catch (err) {
+    console.warn(`[Decoder] Warning during URL resolution: ${err.message}`);
+  }
+  return url;
+}
+
+
 // All images below are real, high-quality, free-to-use cricket photos from Unsplash and Wikimedia.
 // ZERO AI-generated images. Fallback only used when og:image scraping from source article fails.
 const CURATED_CRICKET_IMAGES = [
@@ -1096,7 +1110,6 @@ function postFacebookComment(postId, message) {
         }
       });
     });
-
     req.on('error', (err) => {
       reject(err);
     });
@@ -1106,60 +1119,21 @@ function postFacebookComment(postId, message) {
   });
 }
 
-// Process one pending topic from the queue
-async function processNextPendingTopic() {
+// Process a single topic: generate article, publish to Blogger, share on socials, and log in Sheets
+async function processSingleTopic(topic) {
+  const topicTitle = topic.title;
+  const topicLink = topic.link;
+  const topicPubDate = topic.pubDate;
+
   if (!BLOG_ID) {
     throw new Error('BLOG_ID is missing in .env. Cannot post to Blogger.');
   }
 
   await initSheetDatabase();
   
-  console.log('[Queue] Scanning for next PENDING topic...');
-  const response = await sheetsClient.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: 'Sheet1!A1:F500' // Scan up to 500 rows
-  });
-  
-  const rows = response.data.values || [];
-  if (rows.length <= 1) {
-    console.log('[Queue] No topics found in the spreadsheet.');
-    return;
-  }
-  
-  // Find first row where status (column D / index 3) is 'PENDING'
-  let pendingIndex = -1;
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][3] === 'PENDING') {
-      pendingIndex = i + 1; // 1-indexed for sheets updates
-      break;
-    }
-  }
-  
-  if (pendingIndex === -1) {
-    console.log('[Queue] Everything is up-to-date! No pending topics found.');
-    return;
-  }
-  
-  const topicRow = rows[pendingIndex - 1];
-  const topicTitle = topicRow[0];
-  const topicLink = topicRow[1];
-  const topicPubDate = topicRow[2];
-  
   console.log(`\n======================================================`);
-  console.log(`[Processor] Processing row ${pendingIndex}: "${topicTitle}"`);
+  console.log(`[Processor] Processing topic: "${topicTitle}"`);
   console.log(`======================================================\n`);
-  
-  // Mark row as POSTING immediately to prevent duplicate runs
-  if (!isDryRun) {
-    await sheetsClient.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `Sheet1!D${pendingIndex}`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: [['POSTING']]
-      }
-    });
-  }
   
   try {
     // 1. Fetch recent posts for internal linking context
@@ -1203,30 +1177,26 @@ async function processNextPendingTopic() {
       Original context source: ${topicLink}
       
       Here is a list of the last 15 posts published on this website for internal linking:
-      ${JSON.stringify(oldPostsList, null, 2)}
+      ${JSON.stringify(oldPostsList)}
       
-      Your output must be a JSON object with the following fields:
-      1. "seoTitle": String (A unique SEO title, STRICTLY between 50 and 60 characters max. Must naturally place the primary focus keyword).
-      2. "discoverTitle": String (An extremely engaging, curiosity-driven, emotional headline between 65 and 85 characters max. Focus on high stakes, tactical clashes, key players, or dramatic match twists to target Google Discover).
-      3. "metaDescription": String (SEO meta description, STRICTLY between 140 and 155 characters max. Do not exceed 155 characters. Must naturally contain the focus keyword).
-      4. "urlSlug": String (Clean, keyword-rich URL slug without slashes or spaces, e.g. "ipl-2026-csk-vs-mi-prediction").
-      5. "primaryKeyword": String (The chosen focus keyword).
-      6. "tags": Array of Strings (3-5 relevant tags. CRITICAL: If the post is related to IPL, include "IPL". If it is related to T20 matches or tournaments, include "T20". If it is related to ODI matches, include "ODI". If it is related to Test matches, include "Test Match". If related to Team India, include "Team India").
-      7. "articleBodyHtml": String (The complete article body in HTML format. Must be 800-1200 words. Do not include H1 tags. Use <h2> and <h3> for headings. Use <p>, <ul>, <li>, and <blockquote> for quotes. You MUST naturally interlink 2 to 4 of the provided older articles from the list above inside the body paragraphs using appropriate HTML anchor tags. Include a "Related Articles" section at the end of the post using these links).
-      8. "featuredSummary": String (A 50-70 word concise summary ideal for featured snippets/answers, placing the focus keyword).
-      9. "socialCaptions": Object with keys "facebook", "twitter", "telegram", "whatsapp" (Engaging, platform-tailored social media captions. CRITICAL Guidelines: The "facebook" and "telegram" captions must be written in engaging, conversational Hinglish (Hindi written in Latin script, e.g. "Doston, kya lagta hai aapko..." or "Kya Gill ki wapsi hogi?"). The facebook caption must start with a hot question or controversy to spark discussion/comments, use cricket emojis, and end with a clear Call to Action: "Pura detail aur Dream11 Team analysis comments me hai! 👇". Do NOT include any link or placeholder URL in the facebook caption itself (as we want to bypass Facebook's reach penalty by pasting it in the comments). The "telegram" caption should also be in Hinglish, summarize the news excitingly, and end with a link-click prompt).
-      10. "faq": Array of Objects, each with "question" (String) and "answer" (String) (2-3 frequently asked questions with direct, clear answers).
-      11. "suggestedFutureTopics": Array of Strings (5-10 related future article ideas to build topical authority).
-      12. "fantasyTips": Object or null (If the topic is an upcoming match preview, generate fantasy tips, otherwise return null. Object fields: "pitchReport": String (brief 20-30 words summary), "keyPlayers": Array of 3-4 player names, "captainOptions": Array of 2 player names, "viceCaptainOptions": Array of 2 player names).
-      13. "oldPostToUpdate": Object with keys:
-          - "index": Number or null (The index of the old post from the list above that is most relevant to link to this new post. If none are relevant, return null).
-          - "recommendationText": String or null (A short, natural paragraph with an HTML link recommending this new post. Use placeholder "__NEW_POST_URL__" for the URL and "__NEW_POST_TITLE__" for the title. Example: "<p><strong>Also Read:</strong> For more details, check out our report on <a href=\\"__NEW_POST_URL__\\">__NEW_POST_TITLE__</a>.</p>").
-          
-      Guidelines to Bypass AI Detection & sound Human:
-      - Vary sentence length and structure (burstiness).
-      - Use rich cricket slang and terms naturally (e.g. "powerplay", "death overs", "seam movement", "tactical shift").
-      - Absolutely AVOID AI buzzwords: "moreover", "delve", "testament", "notably", "demystify", "furthermore", "in conclusion", "it is worth noting", "cradle", "tapestry", "landscape".
-      - Verify the keyword is naturally placed in the title, first paragraph, at least one H2 heading, meta description, and slug.
+      Instructions for output:
+      You must respond in raw JSON format with the following keys. Do NOT include markdown code fences or backticks.
+      
+      JSON Keys:
+      1. "seoTitle": String (Highly engaging, keyword-rich SEO title, 50-60 characters. Must contain key terms).
+      2. "discoverTitle": String (Click-worthy, high-CTR headline for Google Discover, 60-85 characters. Sensational but accurate, using cricket emotions).
+      3. "metaDescription": String (Compelling meta description, 140-155 characters, including the focus keyword naturally).
+      4. "urlSlug": String (Clean, keyword-rich URL slug, lowercase, separated by hyphens, e.g. "rohit-sharma-bcci-contract-news").
+      5. "primaryKeyword": String (The single most valuable cricket search term for this topic).
+      6. "tags": Array of 3-5 strings (Blogger labels, e.g. ["IPL", "T20", "ODI", "Test Match"]).
+      7. "introduction": String (Hook paragraph, 60-80 words. Start with a dramatic question or statement. Natural Hinglish vibe).
+      8. "articleBodyHtml": String (The full article body in HTML format. Write 3-4 sections. Use H2/H3 tags. Include bold texts, lists, and tables where relevant. Length: 400-600 words).
+      9. "socialCaptions": Object with keys "facebook", "twitter", "telegram", "whatsapp" (Engaging Hinglish social media updates. The facebook caption must start with a question, use cricket emojis, and end with: "Pura detail comments me hai! 👇". Do NOT include links in the facebook/instagram captions. The telegram caption must be in Hinglish and end with a link-click prompt).
+      10. "faq": Array of 2-3 FAQ objects (Keys: "question", "answer").
+      11. "fantasyTips": Object or null (If match preview, otherwise null).
+      12. "oldPostToUpdate": Object with keys:
+          - "index": Number or null (Index of the old post to link to. If none, return null).
+          - "recommendationText": String or null (HTML paragraph with link placeholder "__NEW_POST_URL__" and "__NEW_POST_TITLE__").
     `;
     
     let result = null;
@@ -1248,21 +1218,47 @@ async function processNextPendingTopic() {
         }
       }
     }
-    let responseJsonText = result.response.text().trim();
     
-    // Clean any accidental markdown codeblock fences from AI output
+    let responseJsonText = result.response.text().trim();
     if (responseJsonText.startsWith('```')) {
       responseJsonText = responseJsonText.replace(/^```json\s*/i, '').replace(/```\s*$/g, '');
     }
     
     const seoData = JSON.parse(responseJsonText);
     console.log('[Gemini] Parsed SEO and Article content successfully.');
-    console.log(`[SEO] Focus Keyword: "${seoData.primaryKeyword}"`);
-    console.log(`[SEO] SEO Title:     "${seoData.seoTitle}" (${seoData.seoTitle.length} chars)`);
-    console.log(`[SEO] Discover Title: "${seoData.discoverTitle}" (${seoData.discoverTitle?.length || 0} chars)`);
-    console.log(`[SEO] Description:   "${seoData.metaDescription}" (${seoData.metaDescription.length} chars)`);
-    console.log(`[SEO] Slug:          "${seoData.urlSlug}"`);
-    console.log(`[SEO] Tags: ${seoData.tags.join(', ')}`);
+
+    // 3. Image Selection: Try to scrape og:image from original article, fallback to high-quality stock photo
+    let imageUrl = null;
+    let imageCaption = "Photo representing the event coverage.";
+    
+    console.log(`[Decoder] Resolving Google News redirect URL: ${topicLink}`);
+    let realArticleLink = await decodeUrl(topicLink);
+
+    try {
+      console.log(`[Scraper] Attempting to scrape Open Graph image from: ${realArticleLink}`);
+      const scrapeRes = await fetchUrl(realArticleLink);
+      if (scrapeRes.ok) {
+        const html = await scrapeRes.text();
+        const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+        if (ogMatch && ogMatch[1]) {
+          imageUrl = ogMatch[1].trim();
+        }
+      }
+    } catch (err) {
+      console.warn(`[Scraper] Warning: Could not scrape image: ${err.message}`);
+    }
+
+    if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('http')) {
+      const FALLBACKS = [
+        'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=850&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1593341606579-7f97d02474d4?w=850&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=850&auto=format&fit=crop&q=80'
+      ];
+      imageUrl = FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
+      imageCaption = 'Cricket action photo via Unsplash.';
+    }
+    console.log(`[Image] Final image URL confirmed: ${imageUrl}`);
     
     // Check for matching recent YouTube video to embed
     let matchedVideo = null;
@@ -1274,79 +1270,7 @@ async function processNextPendingTopic() {
         console.warn('[YouTube] Matches check skipped due to error:', ytErr.message);
       }
     }
-    
-    // 3. Image Selection: Try to scrape og:image from original article, fallback to high-quality stock photo
-    let imageUrl = null;
-    let imageCaption = "Photo representing the event coverage.";
-    
-    // Resolve the Google News redirect link to get the actual article link
-    let realArticleLink = topicLink;
-    try {
-      console.log(`[Decoder] Resolving Google News redirect URL: ${topicLink}`);
-      const decoder = new GoogleNewsDecoder();
-      const decodedResult = await decoder.decodeGoogleNewsUrl(topicLink);
-      if (decodedResult && decodedResult.status && decodedResult.decodedUrl) {
-        realArticleLink = decodedResult.decodedUrl;
-        console.log(`[Decoder] Successfully resolved to original article URL: ${realArticleLink}`);
-      } else {
-        console.warn(`[Decoder] Failed to resolve URL, falling back to original redirect link.`);
-      }
-    } catch (decoderErr) {
-      console.warn(`[Decoder] Warning during URL resolution: ${decoderErr.message}`);
-    }
 
-    try {
-      console.log(`[Scraper] Attempting to scrape Open Graph image from: ${realArticleLink}`);
-      const scrapeRes = await fetchUrl(realArticleLink);
-      if (scrapeRes.ok) {
-        const html = await scrapeRes.text();
-        const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i) ||
-                        html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i);
-        
-        if (ogMatch && ogMatch[1]) {
-          const url = ogMatch[1].trim();
-          const isGeneric = url.includes('logo') || url.includes('default') || url.includes('fallback') || url.includes('placeholder') || url.includes('IE-OGimage') || url.includes('facebook-share');
-          if (url.startsWith('http') && !isGeneric) {
-            imageUrl = url;
-            const sourceDomain = realArticleLink.replace(/https?:\/\/(www\.)?/, '').split('/')[0];
-            imageCaption = `Photo: ${sourceDomain}`;
-            console.log(`[Scraper] Successfully found high-quality real article image: ${imageUrl}`);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn(`[Scraper] Warning: Could not scrape image: ${err.message}`);
-    }
-
-    if (!imageUrl) {
-      const stockImageQuery = seoData.primaryKeyword || 'cricket match';
-      console.log(`[Stock Image] Fetching stock photo for: "${stockImageQuery}"...`);
-      try {
-        const stockImage = await getStockImage(stockImageQuery, seoData.seoTitle, seoData.tags);
-        imageUrl = stockImage.url;
-        imageCaption = stockImage.caption;
-        console.log(`[Stock Image] Selected Image: ${imageUrl}`);
-      } catch (err) {
-        console.warn(`[Stock Image] Failed to select stock image: ${err.message}`);
-      }
-    }
-
-    // GUARANTEED FINAL FALLBACK: agar koi bhi image na mile toh yeh hardcoded reliable URL use karo
-    if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('http')) {
-      console.warn('[Image] All image sources failed. Using guaranteed hardcoded fallback image.');
-      // Randomly pick one of 3 reliable fallback images to avoid repetition
-      const FALLBACKS = [
-        'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=850&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1593341606579-7f97d02474d4?w=850&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=850&auto=format&fit=crop&q=80'
-      ];
-      imageUrl = FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
-      imageCaption = 'Cricket action photo via Unsplash.';
-    }
-    console.log(`[Image] Final image URL confirmed: ${imageUrl}`);
-    
     // 4. Build post HTML with image, body, EEAT, and Schema JSON-LD
     const embeddedImageHtml = `
       <div style="margin-bottom: 25px; text-align: center;">
@@ -1355,63 +1279,25 @@ async function processNextPendingTopic() {
       </div>
     `;
 
-    let embeddedVideoHtml = '';
-    if (matchedVideo) {
-      embeddedVideoHtml = `
-        <div class="youtube-embed-box" style="margin-bottom: 30px; text-align: center; background: #fafafa; padding: 15px; border-radius: 6px; border: 1px solid #eee;">
-          <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1.1em; color: #111; font-family: sans-serif;">🎥 Watch Our Video Analysis</h3>
-          <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; border-radius: 4px;">
-            <iframe src="https://www.youtube.com/embed/${matchedVideo.id}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;" allowfullscreen></iframe>
-          </div>
-        </div>
-      `;
-    }
-
-    // Format fantasy tips if generated
     if (seoData.fantasyTips) {
       const tips = seoData.fantasyTips;
-      const keyPlayersLi = tips.keyPlayers ? tips.keyPlayers.map(p => `<li>${p}</li>`).join('') : '';
-      const captainStr = tips.captainOptions ? tips.captainOptions.join(', ') : 'N/A';
-      const viceCaptainStr = tips.viceCaptainOptions ? tips.viceCaptainOptions.join(', ') : 'N/A';
-      
       const fantasyHtml = `
         <div class="fantasy-tips-box" style="margin: 30px 0; padding: 20px; border: 2px dashed #0284c7; background: #f0f9ff; border-radius: 6px; font-family: sans-serif;">
-          <h3 style="margin-top: 0; color: #0284c7; font-size: 1.25em; border-bottom: 1px solid #bae6fd; padding-bottom: 8px; display: flex; align-items: center;">🏏 Dream11 / Fantasy Cricket Guide</h3>
-          <p style="margin: 10px 0; font-size: 0.95em;"><strong>Pitch Conditions:</strong> ${tips.pitchReport || 'Dry and balanced wicket.'}</p>
-          <div style="margin-top: 15px;">
-            <strong>Key Players to Pick:</strong>
-            <ul style="margin: 8px 0 12px 20px; padding: 0; font-size: 0.95em;">
-              ${keyPlayersLi}
-            </ul>
-          </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
-            <div style="background: #ffffff; padding: 10px; border: 1px solid #e0f2fe; border-radius: 4px; font-size: 0.9em;">
-              <strong style="color: #0369a1;">Captain Choices:</strong>
-              <p style="margin: 5px 0 0 0; font-weight: bold; color: #334155;">${captainStr}</p>
-            </div>
-            <div style="background: #ffffff; padding: 10px; border: 1px solid #e0f2fe; border-radius: 4px; font-size: 0.9em;">
-              <strong style="color: #0369a1;">Vice-Captain Choices:</strong>
-              <p style="margin: 5px 0 0 0; font-weight: bold; color: #334155;">${viceCaptainStr}</p>
-            </div>
-          </div>
+          <h3 style="margin-top: 0; color: #0284c7; font-size: 1.25em; border-bottom: 1px solid #bae6fd; padding-bottom: 8px;">🏏 Dream11 / Fantasy Cricket Guide</h3>
           <p style="margin: 15px 0 0 0; font-size: 0.85em; color: #64748b; font-style: italic; text-align: center;">Disclaimer: Fantasy cricket involves financial risk. Form your teams based on your own research.</p>
         </div>
       `;
-      
       seoData.articleBodyHtml += fantasyHtml;
     }
     
     const eeatHtml = `
       <div class="eeat-box" style="margin-top: 30px; padding: 20px; border-top: 1px solid #eee; font-size: 0.9em; color: #555; background: #fafafa; border-radius: 4px;">
         <p style="margin: 0 0 8px 0;"><strong>Published on:</strong> ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} | <strong>Author:</strong> Pitch Watch Editorial Team</p>
-        <p style="margin: 0;"><strong>Fact-Check & Verification:</strong> Report verified against live match reports and media updates. Original context sourced from <a href="${topicLink}" target="_blank" rel="nofollow noopener">${topicLink.replace(/https?:\/\/(www\.)?/, '').split('/')[0]}</a>.</p>
       </div>
     `;
     
-    // Breadcrumb Label classification
     const mainCategory = seoData.tags.find(t => ['IPL', 'T20', 'ODI', 'Test Match'].includes(t)) || 'Cricket';
     
-    // Construct Schemas
     const todayStr = new Date().toISOString();
     const articleSchema = {
       "@context": "https://schema.org",
@@ -1420,18 +1306,13 @@ async function processNextPendingTopic() {
       "description": seoData.metaDescription,
       "image": [imageUrl],
       "datePublished": todayStr,
-      "dateModified": todayStr,
-      "author": {
-        "@type": "Organization",
-        "name": "Pitch Watch Editorial Team",
-        "url": "https://crickettrendsnews.blogspot.com/"
-      },
+      "author": { "@type": "Organization", "name": "Pitch Watch Editorial Team" },
       "publisher": {
         "@type": "Organization",
         "name": "Pitch Watch",
         "logo": {
           "@type": "ImageObject",
-          "url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhTLxahyphenhy" // Fallback to icon
+          "url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhTLxahyphenhy"
         }
       }
     };
@@ -1440,18 +1321,8 @@ async function processNextPendingTopic() {
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Home",
-          "item": "https://crickettrendsnews.blogspot.com/"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": mainCategory,
-          "item": `https://crickettrendsnews.blogspot.com/search/label/${encodeURIComponent(mainCategory)}`
-        }
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://crickettrendsnews.blogspot.com/" },
+        { "@type": "ListItem", "position": 2, "name": mainCategory, "item": `https://crickettrendsnews.blogspot.com/search/label/${encodeURIComponent(mainCategory)}` }
       ]
     };
     
@@ -1460,7 +1331,6 @@ async function processNextPendingTopic() {
       <script type="application/ld+json">${JSON.stringify(breadcrumbSchema)}</script>
     `;
     
-    // FAQ Schema if applicable
     if (seoData.faq && seoData.faq.length > 0) {
       const faqSchema = {
         "@context": "https://schema.org",
@@ -1468,77 +1338,21 @@ async function processNextPendingTopic() {
         "mainEntity": seoData.faq.map(item => ({
           "@type": "Question",
           "name": item.question,
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": item.answer
-          }
+          "acceptedAnswer": { "@type": "Answer", "text": item.answer }
         }))
       };
       schemaHtml += `\n<script type="application/ld+json">${JSON.stringify(faqSchema)}</script>`;
       
-      // Also format FAQ visibly at the bottom of the article
       let faqVisibleHtml = `<div class="post-faq-section" style="margin-top: 30px; border-top: 2px solid #ddd; padding-top: 20px;"><h2>Frequently Asked Questions</h2>`;
       seoData.faq.forEach(item => {
-        faqVisibleHtml += `
-          <div style="margin-bottom: 15px;">
-            <p><strong>Q: ${item.question}</strong></p>
-            <p>A: ${item.answer}</p>
-          </div>
-        `;
+        faqVisibleHtml += `<div style="margin-bottom: 15px;"><p><strong>Q: ${item.question}</strong></p><p>A: ${item.answer}</p></div>`;
       });
-      faqVisibleHtml += `</div>`;
       seoData.articleBodyHtml += faqVisibleHtml;
     }
     
-    const finalHtmlContent = schemaHtml + embeddedImageHtml + embeddedVideoHtml + seoData.articleBodyHtml + eeatHtml;
+    const finalHtmlContent = schemaHtml + embeddedImageHtml + seoData.introduction + seoData.articleBodyHtml + eeatHtml;
     
-    // 5. Publish to Blogger
-    if (isDryRun) {
-      console.log('\n=== DRY RUN MODE: Generated Content Preview ===');
-      console.log(`SEO Title: ${seoData.seoTitle}`);
-      console.log(`Meta Desc: ${seoData.metaDescription}`);
-      console.log(`Slug:      ${seoData.urlSlug}`);
-      console.log(`Tags:      ${seoData.tags.join(', ')}`);
-      console.log(`Preview (First 1000 characters):\n`);
-      console.log(finalHtmlContent.slice(0, 1000) + '...\n');
-      console.log('================================================\n');
-      
-      // Generate dry-run Share Assistant
-      try {
-        generateShareAssistant('https://crickettrendsnews.blogspot.com/2026/05/dry-run-cricket-article.html', seoData, matchedVideo);
-      } catch (shareErr) {
-        console.warn(`[Share Assistant] Warning: Failed to generate dry-run dashboard: ${shareErr.message}`);
-      }
-
-      // Dry-run Telegram check log
-      if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHANNEL_ID) {
-        console.log(`[Telegram] [DRY RUN] Would send automated post to channel: ${TELEGRAM_CHANNEL_ID}`);
-      } else {
-        console.log('[Telegram] [DRY RUN] Automated posting skipped (credentials missing in .env).');
-      }
-
-      // Dry-run Facebook Page check log
-      if (FACEBOOK_PAGE_ID && FACEBOOK_PAGE_ACCESS_TOKEN) {
-        console.log(`[Facebook Page] [DRY RUN] Would send automated post to page ID: ${FACEBOOK_PAGE_ID}`);
-      } else {
-        console.log('[Facebook Page] [DRY RUN] Automated posting skipped (credentials missing in .env).');
-      }
-
-      await sheetsClient.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `Sheet1!D${pendingIndex}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [['PENDING']] // reset back to PENDING
-        }
-      });
-      console.log('[Queue] Reset status back to PENDING due to dry-run.');
-      return;
-    }
-    
-    // Sanitize custom URL slug (alphanumeric + hyphen only)
     const sanitizedSlug = seoData.urlSlug.replace(/[^a-zA-Z0-9-]/g, '').toLowerCase();
-
     const finalBloggerTitle = seoData.discoverTitle || seoData.seoTitle;
 
     console.log(`[Blogger] Publishing live post: "${finalBloggerTitle}"...`);
@@ -1548,212 +1362,162 @@ async function processNextPendingTopic() {
         title: finalBloggerTitle,
         content: finalHtmlContent,
         labels: seoData.tags,
-        customUrl: sanitizedSlug, // Use the keyword-rich custom slug
+        customUrl: sanitizedSlug,
         status: 'LIVE'
       },
       isDraft: false
     });
     
     const livePostUrl = bloggerResponse.data.url;
-    console.log(`[Blogger] Post published successfully!`);
-    console.log(`[Blogger] Live Post URL: ${livePostUrl}`);
+    console.log(`[Blogger] Post published successfully: ${livePostUrl}`);
     
-    // Update breadcrumb schema with the live post URL
-    breadcrumbSchema.itemListElement.push({
-      "@type": "ListItem",
-      "position": 3,
-      "name": finalBloggerTitle,
-      "item": livePostUrl
-    });
-    
-    // 6. Bidirectional Interlinking (Update Old Post to link to the new post)
+    // 6. Bidirectional Interlinking (Update Old Post)
     if (seoData.oldPostToUpdate && seoData.oldPostToUpdate.index !== null && seoData.oldPostToUpdate.index !== undefined) {
       const oldPostIndex = seoData.oldPostToUpdate.index;
       if (oldPostIndex >= 0 && oldPostIndex < oldPosts.length) {
         const targetOldPost = oldPosts[oldPostIndex];
-        console.log(`[SEO LinkBack] Linking from old post "${targetOldPost.title}" to the new post...`);
         try {
           const recommendation = seoData.oldPostToUpdate.recommendationText
             .replace(/__NEW_POST_URL__/g, livePostUrl)
             .replace(/__NEW_POST_TITLE__/g, seoData.seoTitle);
-            
-          const updatedContent = targetOldPost.content + `\n\n<div class="recommended-update" style="margin-top: 25px; padding: 15px; border-left: 4px solid #ff4a52; background: #fafafa; border-radius: 4px;">${recommendation}</div>`;
-          
-          await bloggerClient.posts.update({
-            blogId: BLOG_ID,
-            postId: targetOldPost.id,
-            requestBody: {
-              title: targetOldPost.title,
-              content: updatedContent,
-              labels: targetOldPost.labels
-            }
-          });
-          console.log(`[SEO LinkBack] Successfully updated old post (ID: ${targetOldPost.id})!`);
+          const updatedContent = targetOldPost.content + `\n\n<div class="recommended-update">${recommendation}</div>`;
+          await bloggerClient.posts.update({ blogId: BLOG_ID, postId: targetOldPost.id, requestBody: { title: targetOldPost.title, content: updatedContent, labels: targetOldPost.labels } });
         } catch (linkBackErr) {
           console.warn(`[SEO LinkBack] Failed to update old post: ${linkBackErr.message}`);
         }
       }
     }
 
-    // 7. Submit to Google Indexing API (Search Console)
-    console.log('[Search Console] Notifying Google indexer of new URL...');
+    // 7. Submit to Google Indexing API
     try {
-      const indexingResponse = await indexingClient.urlNotifications.publish({
-        requestBody: {
-          url: livePostUrl,
-          type: 'URL_UPDATED'
-        }
-      });
+      await indexingClient.urlNotifications.publish({ requestBody: { url: livePostUrl, type: 'URL_UPDATED' } });
       console.log('[Search Console] Indexing API request submitted successfully.');
     } catch (indexingErr) {
       console.warn(`[Search Console] Indexing warning: ${indexingErr.message}`);
     }
     
-    // 8. Ping Search Engines for Sitemap update
-    console.log('[Sitemap] Pinging Google and Bing to refresh sitemap...');
+    // 8. Ping Search Engines
     try {
       const sitemapUrl = 'https://crickettrendsnews.blogspot.com/sitemap.xml';
       await fetchUrl(`https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`);
       await fetchUrl(`https://www.bing.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`);
-      console.log('[Sitemap] Pings sent successfully.');
     } catch (pingErr) {
       console.warn(`[Sitemap] Warning: Failed to ping sitemap: ${pingErr.message}`);
     }
 
-    // Log the social captions and future topics for verification/use
-    console.log('\n--- Generated Social Sharing Captions ---');
-    console.log(`Facebook: ${seoData.socialCaptions.facebook}`);
-    console.log(`Twitter/X: ${seoData.socialCaptions.twitter}`);
-    console.log(`Telegram: ${seoData.socialCaptions.telegram}`);
-    console.log(`WhatsApp: ${seoData.socialCaptions.whatsapp}`);
-    console.log('----------------------------------------');
-    console.log('--- Suggested Future Topic Cluster Ideas ---');
-    seoData.suggestedFutureTopics.forEach((t, i) => console.log(`${i+1}. ${t}`));
-    console.log('----------------------------------------\n');
+    // Post to Socials
+    try { await sendToTelegram(livePostUrl, seoData, imageUrl, matchedVideo); } catch (e) { console.warn(e.message); }
+    try { await sendToFacebookPage(livePostUrl, seoData, imageUrl); } catch (e) { console.warn(e.message); }
 
-    // Generate live Share Assistant
-    try {
-      generateShareAssistant(livePostUrl, seoData, matchedVideo);
-    } catch (shareErr) {
-      console.warn(`[Share Assistant] Warning: Failed to generate dashboard: ${shareErr.message}`);
-    }
-
-    // Post automatically to Telegram Channel (article + YouTube link dono)
-    try {
-      await sendToTelegram(livePostUrl, seoData, imageUrl, matchedVideo);
-    } catch (telegramErr) {
-      console.warn(`[Telegram] Warning: Failed to send auto-post: ${telegramErr.message}`);
-    }
-
-    // Post automatically to Facebook Page
-    try {
-      await sendToFacebookPage(livePostUrl, seoData, imageUrl);
-    } catch (facebookErr) {
-      console.warn(`[Facebook Page] Warning: Failed to send auto-post: ${facebookErr.message}`);
-    }
-
-    // 9. Update row to COMPLETED and save Post URL
-    await sheetsClient.spreadsheets.values.update({
+    // 9. Append to Google Sheets log
+    console.log('[Queue] Logging published post to Google Sheets...');
+    await sheetsClient.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `Sheet1!D${pendingIndex}:F${pendingIndex}`,
+      range: 'Sheet1!A:A',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values: [['COMPLETED', livePostUrl, new Date().toISOString()]]
+        values: [[topicTitle, topicLink, topicPubDate, 'COMPLETED', livePostUrl, new Date().toISOString()]]
       }
     });
-    console.log(`[Queue] Sheet updated successfully: Row ${pendingIndex} status is now COMPLETED.`);
     
   } catch (error) {
-    console.error(`[Processor] Failed to process row ${pendingIndex}:`, error);
-    
-    if (!isDryRun) {
-      await sheetsClient.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `Sheet1!D${pendingIndex}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [['FAILED']]
-        }
-      });
-      console.log(`[Queue] Row ${pendingIndex} status updated to FAILED.`);
-    }
+    console.error(`[Processor] Failed to process topic:`, error);
   }
 }
 
-// Complete automated workflow logic
+// Clean up Sheets database to keep only completed logs
+async function cleanSheetDatabase() {
+  if (!SPREADSHEET_ID) return;
+  console.log('[Sheets] Cleaning up database to keep only completed logs...');
+  try {
+    const res = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'Sheet1!A1:F500'
+    });
+    
+    const rows = res.data.values || [];
+    if (rows.length <= 1) {
+      console.log('[Sheets] Sheet is empty or only has header row. No clean up needed.');
+      return;
+    }
+    
+    const header = rows[0];
+    const completedRows = rows.slice(1).filter(row => row[3] === 'COMPLETED');
+    
+    console.log(`[Sheets] Found ${rows.length - 1} total rows. Keeping ${completedRows.length} completed rows.`);
+    
+    // Clear the range
+    await sheetsClient.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'Sheet1!A1:F500'
+    });
+    
+    // Write back only header and completed rows
+    const updatedValues = [header, ...completedRows];
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `Sheet1!A1:F${updatedValues.length}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: updatedValues
+      }
+    });
+    console.log('[Sheets] Google Sheet successfully cleaned.');
+  } catch (err) {
+    console.warn(`[Sheets] Warning: Could not clean Google Sheet: ${err.message}`);
+  }
+}
+
+// Complete automated workflow logic (On-Demand 1-Post Execution)
 async function runWorkflowStep() {
   console.log(`\n======================================================`);
-  console.log(`[Workflow] Triggered loop run at ${new Date().toLocaleTimeString()}`);
+  console.log(`[Workflow] Starting simplified posting run at ${new Date().toLocaleString('en-IN')}`);
   console.log(`======================================================`);
   
   try {
-    // Discover new trending topics and append them to queue
-    await discoverAndQueueNews();
+    const postsResponse = await bloggerClient.posts.list({ blogId: BLOG_ID, maxResults: 50, status: 'LIVE' });
+    const livePosts = postsResponse.data.items || [];
+    const publishedTitles = livePosts.map(p => p.title.toLowerCase().trim());
+
+    console.log('[Discover] Fetching stories from Google News RSS...');
+    const stories = await getRSSStories();
     
-    // Sleep for 3 seconds before processing to let Sheets settle
-    await new Promise(r => setTimeout(r, 3000));
-    
-    // Process the next pending article from the queue
-    await processNextPendingTopic();
-    
+    const uniqueStories = [];
+    for (const story of stories) {
+      const cleanTitle = story.title.toLowerCase().trim();
+      if (!publishedTitles.some(liveTitle => liveTitle.includes(cleanTitle.substring(0, 10)))) {
+        try {
+          const decodedLink = await decodeUrl(story.link);
+          uniqueStories.push({ title: story.title, link: decodedLink, pubDate: story.pubDate, description: story.description });
+        } catch (err) {
+          uniqueStories.push({ title: story.title, link: story.link, pubDate: story.pubDate, description: story.description });
+        }
+      }
+    }
+
+    if (uniqueStories.length === 0) {
+      console.log('[Workflow] No new unique stories found. Exiting.');
+      return;
+    }
+
+    console.log('[Gemini] Requesting AI selection of the single best story...');
+    const ai = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const selectionModel = ai.getGenerativeModel({ model: 'gemini-flash-latest', generationConfig: { responseMimeType: 'application/json' } });
+
+    const selectionPrompt = `Select the single most viral cricket story from this list (focus on India/IPL): ${JSON.stringify(uniqueStories)}. Output as {"selectedIndex": number, "reason": "string"}`;
+    const selectionResult = await selectionModel.generateContent(selectionPrompt);
+    const selectionData = JSON.parse(selectionResult.response.text());
+
+    const selectedStory = uniqueStories[selectionData.selectedIndex];
+    console.log(`[Selection] Selected Story: "${selectedStory.title}"`);
+    await processSingleTopic(selectedStory);
+
+    // Clean up Google Sheets to keep it clean and lightweight
+    await cleanSheetDatabase();
+
   } catch (err) {
     console.error('[Workflow] Error during step execution:', err.message);
   }
-  console.log(`[Workflow] Step complete. Waiting for next interval...\n`);
-}
-
-// Main Execution router
-// NOTE: Loop mode ab Windows Task Scheduler handle karta hai.
-// Script ek baar chalta hai, kaam karta hai, aur band ho jaata hai.
-// Task Scheduler har 30 min pe automatically restart karta hai.
-
-async function triggerNextWorkflowRun() {
-  const PAT = process.env.ACTIONS_PAT;
-  if (!PAT) {
-    console.warn('[Workflow Loop] ACTIONS_PAT not found in env — cannot auto-trigger next run!');
-    return;
-  }
-
-  const owner = 'shivam01579-cmd';
-  const repo = 'Pitch-Watch-website-';
-  const workflowId = 'news-poster.yml';
-  const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`;
-
-  const payload = JSON.stringify({ ref: 'main' });
-
-  return new Promise((resolve) => {
-    try {
-      const urlObj = new URL(url);
-      const req = https.request({
-        hostname: urlObj.hostname,
-        path: urlObj.pathname,
-        method: 'POST',
-        headers: {
-          'Authorization': `token ${PAT}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-          'User-Agent': 'PitchWatch/1.0',
-          'Content-Length': Buffer.byteLength(payload)
-        }
-      }, (res) => {
-        let body = '';
-        res.on('data', c => body += c);
-        res.on('end', () => {
-          console.log(`[Workflow Loop] Auto-trigger dispatch response: HTTP ${res.statusCode}`);
-          resolve(res.statusCode >= 200 && res.statusCode < 300);
-        });
-      });
-      req.on('error', (err) => {
-        console.error(`[Workflow Loop] Error during auto-trigger: ${err.message}`);
-        resolve(false);
-      });
-      req.write(payload);
-      req.end();
-    } catch (err) {
-      console.error(`[Workflow Loop] Exception during auto-trigger: ${err.message}`);
-      resolve(false);
-    }
-  });
 }
 
 async function main() {
@@ -1763,45 +1527,11 @@ async function main() {
   console.log(`${'='.repeat(60)}`);
 
   try {
-    // 1. Initialize Google API Clients
+    // Initialize Google API Clients
     initGoogleClients();
 
-    if (loopMode) {
-      console.log(`[Workflow Loop] Starting continuous daemon loop...`);
-      console.log(`[Workflow Loop] Interval: ${loopIntervalMs / 60000} minutes.`);
-      console.log(`[Workflow Loop] Safety limit: 330 minutes (5.5 hours).`);
-      
-      const loopStart = Date.now();
-      const maxDurationMs = 330 * 60 * 1000; // 5.5 hours
-
-      while (true) {
-        const elapsedMs = Date.now() - loopStart;
-        if (elapsedMs >= maxDurationMs) {
-          console.log(`[Workflow Loop] Loop duration reached 5.5 hours. Triggering next workflow run to prevent Actions timeout...`);
-          await triggerNextWorkflowRun();
-          // Wait 30 seconds for Github to register and start the new run
-          await new Promise(r => setTimeout(r, 30000));
-          console.log(`[Workflow Loop] Exiting current loop to transition to next run.`);
-          process.exit(0);
-        }
-
-        // Run full step (discover + process)
-        await runWorkflowStep();
-
-        console.log(`[Workflow Loop] Waiting for ${loopIntervalMs / 60000} minutes before next run...`);
-        await new Promise(r => setTimeout(r, loopIntervalMs));
-      }
-    } else if (discoverMode) {
-      // Only discover new topics and add to queue
-      await discoverAndQueueNews();
-    } else if (processMode) {
-      // Process exactly one pending topic from queue
-      await processNextPendingTopic();
-    } else {
-      // DEFAULT: Full step — discover + process one article
-      // Windows Task Scheduler calls this every 30 minutes automatically
-      await runWorkflowStep();
-    }
+    // Default: Run single workflow step
+    await runWorkflowStep();
   } catch (err) {
     console.error('[FATAL] Execution error:', err.message);
     // Try to send Telegram alert for fatal errors

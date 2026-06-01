@@ -2,9 +2,14 @@ name: "🏏 Pitch Watch — Auto Post (Prime Times)"
 
 on:
   schedule:
-    # Every 2 hours during Indian prime-time (6:00 AM to 12:00 AM IST)
-    # 0:30 UTC to 18:30 UTC
-    - cron: '30 0,2,4,6,8,10,12,14,16,18 * * *'
+    # 7:30 AM IST (02:00 UTC)
+    - cron: '0 2 * * *'
+    # 12:00 PM IST (06:30 UTC)
+    - cron: '30 6 * * *'
+    # 4:00 PM IST (10:30 UTC)
+    - cron: '30 10 * * *'
+    # 10:00 PM IST (16:30 UTC)
+    - cron: '30 16 * * *'
   workflow_dispatch:
 
 jobs:
@@ -108,59 +113,6 @@ jobs:
               print(f"[Token Refresh] ⚠️ Update failed: {e.code} {e.reason}")
           PYEOF
 
-      # ── AUTO-RETRY FAILED ARTICLES ──────────────────────────
-      # Every Sunday (run #0 of each week), reset FAILED → PENDING
-      # so stuck articles get retried automatically
-      - name: Auto-retry failed queue articles (weekly)
-        if: ${{ github.event.schedule == '*/30 * * * *' }}
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
-          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
-        run: |
-          cd blogger-automation
-          DAY=$(date +%u)  # 7 = Sunday
-          HOUR=$(date +%H)
-          MIN=$(date +%M)
-          # Run retry logic every Sunday at ~midnight UTC
-          if [ "$DAY" = "7" ] && [ "$HOUR" = "00" ]; then
-            echo "[Retry] Sunday midnight — resetting FAILED articles to PENDING..."
-            node << 'JSEOF'
-          import dotenv from 'dotenv';
-          dotenv.config();
-          import { google } from 'googleapis';
-          import fs from 'fs';
-
-          const tokens = JSON.parse(fs.readFileSync('tokens.json', 'utf8'));
-          const auth = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_REDIRECT_URI
-          );
-          auth.setCredentials(tokens);
-          const sheets = google.sheets({ version: 'v4', auth });
-          const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
-
-          const res = await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A2:D500'
-          });
-          const rows = res.data.values || [];
-          const failedRows = rows.map((r, i) => ({ row: i + 2, status: r[3] })).filter(r => r.status === 'FAILED');
-
-          for (const { row } of failedRows) {
-            await sheets.spreadsheets.values.update({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `Sheet1!D${row}`,
-              valueInputOption: 'USER_ENTERED',
-              requestBody: { values: [['PENDING']] }
-            });
-          }
-          console.log(`[Retry] Reset ${failedRows.length} FAILED articles to PENDING.`);
-          JSEOF
-          else
-            echo "[Retry] Not Sunday midnight — skipping retry step."
-          fi
 
       - name: Upload share-assistant as artifact
         if: always()
