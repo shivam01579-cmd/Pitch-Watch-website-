@@ -2,14 +2,10 @@ name: "🏏 Pitch Watch — Auto Post (Prime Times)"
 
 on:
   schedule:
-    # 7:30 AM IST (02:00 UTC)
-    - cron: '0 2 * * *'
-    # 12:00 PM IST (06:30 UTC)
-    - cron: '30 6 * * *'
-    # 4:00 PM IST (10:30 UTC)
-    - cron: '30 10 * * *'
-    # 10:00 PM IST (16:30 UTC)
-    - cron: '30 16 * * *'
+    # 7:00 AM IST (01:30 UTC)
+    - cron: '30 1 * * *'
+    # 11:55 PM IST (18:25 UTC)
+    - cron: '25 18 * * *'
   workflow_dispatch:
 
 jobs:
