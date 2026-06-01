@@ -1443,8 +1443,10 @@ async function cleanSheetDatabase() {
     
     const header = rows[0];
     const completedRows = rows.slice(1).filter(row => row[3] === 'COMPLETED');
+    // Keep only the last 10 completed logs to prevent the Google Sheet from growing
+    const recentCompletedRows = completedRows.slice(-10);
     
-    console.log(`[Sheets] Found ${rows.length - 1} total rows. Keeping ${completedRows.length} completed rows.`);
+    console.log(`[Sheets] Found ${rows.length - 1} total rows. Keeping ${recentCompletedRows.length} recent completed rows.`);
     
     // Clear the range
     await sheetsClient.spreadsheets.values.clear({
@@ -1452,8 +1454,8 @@ async function cleanSheetDatabase() {
       range: 'Sheet1!A1:F500'
     });
     
-    // Write back only header and completed rows
-    const updatedValues = [header, ...completedRows];
+    // Write back only header and recent completed rows
+    const updatedValues = [header, ...recentCompletedRows];
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
       range: `Sheet1!A1:F${updatedValues.length}`,
