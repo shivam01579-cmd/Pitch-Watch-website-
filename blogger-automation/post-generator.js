@@ -248,7 +248,7 @@ async function generatePostContent() {
     
     console.log('Requesting Gemini to write an HTML blog post based on target topic...');
     const ai = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = ai.getGenerativeModel({ model: 'gemini-flash-latest' });
+    const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
     
     const prompt = `
       You are a premium sports journalist writing for Pitch Watch, an analytical cricket news portal.

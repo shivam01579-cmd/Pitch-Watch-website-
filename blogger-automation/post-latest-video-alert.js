@@ -147,7 +147,7 @@ async function run() {
 
   console.log('Generating engaging Hinglish promo caption using Gemini AI...');
   const ai = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = ai.getGenerativeModel({ model: 'gemini-flash-latest' });
+  const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
   const prompt = `
     You are a social media manager for a viral cricket news channel.

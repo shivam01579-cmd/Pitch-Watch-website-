@@ -1165,7 +1165,7 @@ async function processSingleTopic(topic) {
     console.log('[Gemini] Generating SEO structured news analysis in JSON mode...');
     const ai = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = ai.getGenerativeModel({ 
-      model: 'gemini-flash-latest',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: { responseMimeType: 'application/json' }
     });
     
@@ -1502,7 +1502,7 @@ async function runWorkflowStep() {
 
     console.log('[Gemini] Requesting AI selection of the single best story...');
     const ai = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const selectionModel = ai.getGenerativeModel({ model: 'gemini-flash-latest', generationConfig: { responseMimeType: 'application/json' } });
+    const selectionModel = ai.getGenerativeModel({ model: 'gemini-2.5-flash-lite', generationConfig: { responseMimeType: 'application/json' } });
 
     const selectionPrompt = `Select the single most viral cricket story from this list (focus on India/IPL): ${JSON.stringify(uniqueStories)}. Output as {"selectedIndex": number, "reason": "string"}`;
     const selectionResult = await selectionModel.generateContent(selectionPrompt);
